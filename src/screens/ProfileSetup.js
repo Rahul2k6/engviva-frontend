@@ -148,186 +148,218 @@ export default function ProfileSetup() {
   useEffect(() => {
     loadProfile();
   }, []);
+async function loadProfile() {
+  try {
+    setLoading(true);
+    setError("");
 
-  async function loadProfile() {
-    try {
-      setLoading(true);
+    const user = auth.currentUser;
 
-      const user =
-        auth.currentUser;
-
-      if (!user) {
-        setError(
-          "You are not authenticated. Please login again."
-        );
-
-        return;
-      }
-
-      const token =
-        await user.getIdToken();
-
-      const response =
-        await fetch(
-          `${API_BASE}/api/profile`,
-          {
-            headers: {
-              Authorization:
-                `Bearer ${token}`,
-            },
-          }
-        );
-
-      if (response.status === 404) {
-        /*
-         * New user.
-         * Firebase already gives us the email.
-         */
-        setForm((previous) => ({
-          ...previous,
-          email:
-            user.email || "",
-          fullName:
-            user.displayName || "",
-        }));
-
-        return;
-      }
-
-      const result =
-        await response.json();
-
-      if (!result.success) {
-        throw new Error(
-          result.error?.message ||
-            "Unable to load profile."
-        );
-      }
-
-      const data =
-        result.data || {};
-
-      const profile =
-        data.profile || {};
-
-      const engineering =
-        data.engineering || {};
-
-      setForm({
-        fullName:
-          profile.fullName ||
-          data.name ||
-          user.displayName ||
-          "",
-
-        email:
-          profile.email ||
-          user.email ||
-          "",
-
-        phone:
-          profile.phone || "",
-
-        location:
-          profile.location || "",
-
-        college:
-          profile.college || "",
-
-        degree:
-          profile.degree ||
-          data.degree ||
-          "B.Tech",
-
-        branch:
-          profile.branch || "",
-
-        graduationYear:
-          profile.graduationYear || "",
-
-        currentYear:
-          profile.currentYear || "",
-
-        cgpa:
-          profile.cgpa || "",
-
-        backlogs:
-          profile.backlogs ?? "0",
-
-        primaryRole:
-          engineering.primaryRole ||
-          data.role ||
-          "",
-
-        secondaryRoles:
-          engineering.secondaryRoles ||
-          [],
-
-        languages:
-          engineering.languages ||
-          [],
-
-        frameworks:
-          engineering.frameworks ||
-          [],
-
-        databases:
-          engineering.databases ||
-          [],
-
-        cloud:
-          engineering.cloud ||
-          [],
-
-        tools:
-          engineering.tools ||
-          [],
-
-        experienceLevel:
-          engineering.experienceLevel ||
-          "Student",
-
-        internshipExperience:
-          engineering.internshipExperience ||
-          "",
-
-        workExperience:
-          engineering.workExperience ||
-          "",
-
-        expectedPackage:
-          engineering.expectedPackage ||
-          "",
-
-        preferredLocations:
-          engineering.preferredLocations ||
-          [],
-
-        willingToRelocate:
-          engineering.willingToRelocate ??
-          true,
-      });
-
-      setSkills(
-        engineering.skills || []
-      );
-
-      if (
-        data.resume?.uploaded
-      ) {
-        setResumeMode("upload");
-      }
-    } catch (err) {
-      console.error(err);
-
+    if (!user) {
       setError(
-        err.message ||
-          "Unable to load your profile."
+        "You are not authenticated. Please login again."
       );
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const token = await user.getIdToken();
+
+    const response = await fetch(
+      `${API_BASE}/api/profile`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    /*
+     * =====================================================
+     * NEW USER
+     * =====================================================
+     *
+     * Backend says profile does not exist.
+     * Keep Profile Setup visible.
+     */
+    if (response.status === 404) {
+      setForm((previous) => ({
+        ...previous,
+        email: user.email || "",
+        fullName:
+          user.displayName || "",
+      }));
+
+      return;
+    }
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.error?.message ||
+          "Unable to load profile."
+      );
+    }
+
+    const data = result.data || {};
+
+    /*
+     * =====================================================
+     * EXISTING PROFILE — COMPLETION CHECK
+     * =====================================================
+     *
+     * IMPORTANT:
+     *
+     * Only redirect when the backend explicitly says
+     * profileCompleted === true.
+     *
+     * This prevents undefined/missing values from
+     * incorrectly redirecting new users.
+     */
+    if (
+      data.profileCompleted === true ||
+      result.profileCompleted === true
+    ) {
+      window.location.replace(
+        "/dashboard"
+      );
+
+      return;
+    }
+
+    /*
+     * =====================================================
+     * EXISTING BUT INCOMPLETE PROFILE
+     * =====================================================
+     *
+     * Continue loading the existing information into
+     * the form so the user can complete it.
+     */
+
+    const profile =
+      data.profile || {};
+
+    const engineering =
+      data.engineering || {};
+
+    setForm({
+      fullName:
+        profile.fullName ||
+        data.name ||
+        user.displayName ||
+        "",
+
+      email:
+        profile.email ||
+        user.email ||
+        "",
+
+      phone:
+        profile.phone || "",
+
+      location:
+        profile.location || "",
+
+      college:
+        profile.college || "",
+
+      degree:
+        profile.degree ||
+        data.degree ||
+        "B.Tech",
+
+      branch:
+        profile.branch || "",
+
+      graduationYear:
+        profile.graduationYear || "",
+
+      currentYear:
+        profile.currentYear || "",
+
+      cgpa:
+        profile.cgpa || "",
+
+      backlogs:
+        profile.backlogs ?? "0",
+
+      primaryRole:
+        engineering.primaryRole ||
+        data.role ||
+        "",
+
+      secondaryRoles:
+        engineering.secondaryRoles ||
+        [],
+
+      languages:
+        engineering.languages ||
+        [],
+
+      frameworks:
+        engineering.frameworks ||
+        [],
+
+      databases:
+        engineering.databases ||
+        [],
+
+      cloud:
+        engineering.cloud ||
+        [],
+
+      tools:
+        engineering.tools ||
+        [],
+
+      experienceLevel:
+        engineering.experienceLevel ||
+        "Student",
+
+      internshipExperience:
+        engineering.internshipExperience ||
+        "",
+
+      workExperience:
+        engineering.workExperience ||
+        "",
+
+      expectedPackage:
+        engineering.expectedPackage ||
+        "",
+
+      preferredLocations:
+        engineering.preferredLocations ||
+        [],
+
+      willingToRelocate:
+        engineering.willingToRelocate ??
+        true,
+    });
+
+    setSkills(
+      engineering.skills || []
+    );
+
+    if (data.resume?.uploaded) {
+      setResumeMode("upload");
+    }
+
+  } catch (err) {
+    console.error(
+      "[PROFILE LOAD]",
+      err
+    );
+
+    setError(
+      err.message ||
+        "Unable to load your profile."
+    );
+
+  } finally {
+    setLoading(false);
   }
+}
 
   /*
    * ---------------------------------------------------------

@@ -275,9 +275,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const API_URL =
-    import.meta.env.VITE_API_URL ||
-    "https://engviva-backend.onrender.com";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://engviva-backend.onrender.com";
 
   /* -------------------------------------------------------
      AUTH + DASHBOARD
@@ -313,13 +313,13 @@ export default function Dashboard() {
                 },
               }
             );
+if (!response.ok) {
+  const errorText = await response.text();
 
-          if (!response.ok) {
-            throw new Error(
-              "Dashboard request failed"
-            );
-          }
-
+  throw new Error(
+    `API ${response.status}: ${errorText}`
+  );
+}
           const payload =
             await response.json();
 
