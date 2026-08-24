@@ -1400,11 +1400,11 @@ export default function CompanyDetails() {
           );
 
         switch (module) {
-          case "aptitude":
-            navigate(
-              `/assessments?company=${company}&role=${role}`
-            );
-            break;
+         case "aptitude":
+  navigate(
+    `/practice/assessments?company=${company}&role=${role}`
+  );
+  break;
 
           case "technical":
             navigate(
