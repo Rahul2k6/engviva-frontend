@@ -1,128 +1,58 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const API_BASE =
   import.meta.env.VITE_API_URL ||
   "https://engviva-backend.onrender.com";
 
-const FALLBACK_COMPANIES = {
-  infosys: {
-    name: "Infosys",
-    short: "INFOSYS",
-    logo: "I",
-  },
-  tcs: {
-    name: "TCS",
-    short: "TCS",
-    logo: "T",
-  },
-  wipro: {
-    name: "Wipro",
-    short: "WIPRO",
-    logo: "W",
-  },
-  accenture: {
-    name: "Accenture",
-    short: "ACCENTURE",
-    logo: "A",
-  },
-  cognizant: {
-    name: "Cognizant",
-    short: "COG",
-    logo: "C",
-  },
-  amazon: {
-    name: "Amazon",
-    short: "AMAZON",
-    logo: "A",
-  },
-  microsoft: {
-    name: "Microsoft",
-    short: "MS",
-    logo: "M",
-  },
-  google: {
-    name: "Google",
-    short: "GOOGLE",
-    logo: "G",
-  },
-  nvidia: {
-    name: "NVIDIA",
-    short: "NVIDIA",
-    logo: "N",
-  },
+const COMPANY_FALLBACKS = {
+  infosys: { name: "Infosys", logo: "I" },
+  tcs: { name: "TCS", logo: "T" },
+  wipro: { name: "Wipro", logo: "W" },
+  accenture: { name: "Accenture", logo: "A" },
+  cognizant: { name: "Cognizant", logo: "C" },
+  amazon: { name: "Amazon", logo: "A" },
+  microsoft: { name: "Microsoft", logo: "M" },
+  google: { name: "Google", logo: "G" },
+  nvidia: { name: "NVIDIA", logo: "N" },
 };
 
-function normalizeCompanyId(value) {
-  if (!value) return "";
-
-  return String(value)
+function normalizeId(value) {
+  return String(value || "")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "-");
 }
 
-function getCompanyFromLocation(location) {
+function getCompanyId(location) {
   const params = new URLSearchParams(location.search);
 
-  const queryCompany =
-    params.get("company") ||
+  return (
     params.get("companyId") ||
-    params.get("company_id");
-
-  if (queryCompany) {
-    return queryCompany;
-  }
-
-  const stateCompany =
+    params.get("company") ||
     location.state?.companyId ||
     location.state?.company?.id ||
-    location.state?.company?.slug;
-
-  if (stateCompany) {
-    return stateCompany;
-  }
-
-  return "";
+    location.state?.company?.slug ||
+    ""
+  );
 }
 
-function normalizeTests(payload) {
+function normalizeAssessments(payload) {
   if (!payload) return [];
 
-  let raw = [];
+  let source = [];
 
   if (Array.isArray(payload)) {
-    raw = payload;
+    source = payload;
   } else if (Array.isArray(payload.assessments)) {
-    raw = payload.assessments;
+    source = payload.assessments;
   } else if (Array.isArray(payload.tests)) {
-    raw = payload.tests;
+    source = payload.tests;
   } else if (Array.isArray(payload.data)) {
-    raw = payload.data;
-  } else if (Array.isArray(payload.rounds)) {
-    raw = payload.rounds.filter((item) => {
-      const type = String(
-        item.type || item.roundType || item.category || ""
-      ).toLowerCase();
-
-      return (
-        type.includes("aptitude") ||
-        type.includes("assessment") ||
-        type.includes("ability")
-      );
-    });
+    source = payload.data;
   }
 
-  return raw.map((item, index) => ({
+  return source.map((item, index) => ({
     id:
       item.id ||
       item.testId ||
@@ -137,50 +67,35 @@ function normalizeTests(payload) {
 
     description:
       item.description ||
-      "Company-specific aptitude assessment designed around placement-style questions.",
-
-    duration:
-      item.duration ||
-      item.durationMinutes ||
-      item.timeLimit ||
-      20,
+      "Company-specific aptitude assessment.",
 
     questions:
-      item.questionsCount ||
-      item.questionCount ||
-      item.totalQuestions ||
-      (Array.isArray(item.questions) ? item.questions.length : 20),
+      Number(
+        item.questions ||
+          item.questionsCount ||
+          item.questionCount ||
+          item.totalQuestions
+      ) || 20,
+
+    duration:
+      Number(
+        item.duration ||
+          item.durationMinutes ||
+          item.timeLimit
+      ) || 20,
 
     difficulty:
       item.difficulty ||
       item.level ||
       "Mixed",
 
-    attempts:
-      item.attempts ||
-      item.maxAttempts ||
-      "Unlimited",
-
-    status: item.status || "available",
-
-    companyId:
-      item.companyId ||
-      item.company ||
-      item.companySlug ||
-      "",
-
-    completed:
-      Boolean(item.completed),
+    completed: Boolean(item.completed),
 
     score:
       item.score !== undefined && item.score !== null
         ? item.score
         : null,
   }));
-}
-
-function GlassCard({ children, style }) {
-  return <View style={[styles.glassCard, style]}>{children}</View>;
 }
 
 export default function Assessments() {
@@ -191,37 +106,38 @@ export default function Assessments() {
   const [refreshing, setRefreshing] = useState(false);
   const [tests, setTests] = useState([]);
   const [error, setError] = useState("");
-  const [companyId, setCompanyId] = useState("");
+
+  const companyId = useMemo(
+    () => normalizeId(getCompanyId(location)),
+    [location]
+  );
 
   const company = useMemo(() => {
-    const id = normalizeCompanyId(companyId);
-
     return (
-      FALLBACK_COMPANIES[id] || {
+      COMPANY_FALLBACKS[companyId] || {
         name:
           location.state?.company?.name ||
           location.state?.companyName ||
           "Selected Company",
-        short: "COMPANY",
         logo: "C",
       }
     );
   }, [companyId, location.state]);
 
-  const getAuthToken = async () => {
+  const getToken = async () => {
     try {
-      const firebaseModule = await import("../firebase");
+      const firebase = await import("../firebase");
 
       const auth =
-        firebaseModule.auth ||
-        firebaseModule.default?.auth ||
+        firebase.auth ||
+        firebase.default?.auth ||
         null;
 
       if (auth?.currentUser) {
         return await auth.currentUser.getIdToken();
       }
     } catch (err) {
-      console.warn("Firebase token unavailable:", err);
+      console.warn("[ENGVIVA] Firebase token unavailable", err);
     }
 
     return null;
@@ -231,13 +147,7 @@ export default function Assessments() {
     setError("");
 
     try {
-      const currentCompany = normalizeCompanyId(
-        getCompanyFromLocation(location)
-      );
-
-      setCompanyId(currentCompany);
-
-      const token = await getAuthToken();
+      const token = await getToken();
 
       const headers = {
         Accept: "application/json",
@@ -247,18 +157,17 @@ export default function Assessments() {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      /*
-       * Company-specific assessment endpoint.
-       *
-       * The frontend intentionally accepts multiple backend response
-       * structures so the screen remains stable while the backend
-       * assessment database evolves.
-       */
-      const url = currentCompany
-        ? `${API_BASE}/api/assessments?company=${encodeURIComponent(
-            currentCompany
-          )}&type=aptitude`
-        : `${API_BASE}/api/assessments?type=aptitude`;
+      const params = new URLSearchParams();
+
+      params.set("type", "aptitude");
+
+      if (companyId) {
+        params.set("company", companyId);
+      }
+
+      const url = `${API_BASE}/api/assessments?${params.toString()}`;
+
+      console.log("[ENGVIVA] Loading assessments:", url);
 
       const response = await fetch(url, {
         method: "GET",
@@ -272,398 +181,416 @@ export default function Assessments() {
       }
 
       const payload = await response.json();
-      const normalized = normalizeTests(payload);
+
+      console.log("[ENGVIVA] Assessment response:", payload);
+
+      const normalized = normalizeAssessments(payload);
 
       setTests(normalized);
     } catch (err) {
-      console.error("[ENGVIVA] Assessment loading error:", err);
+      console.error("[ENGVIVA] Assessment loading failed:", err);
 
       setTests([]);
 
       setError(
-        "Unable to load aptitude assessments right now. Please retry."
+        "Unable to connect to the assessment service."
       );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [location]);
+  }, [companyId]);
 
   useEffect(() => {
     loadAssessments();
   }, [loadAssessments]);
 
-  const onRefresh = () => {
+  const refresh = () => {
     setRefreshing(true);
     loadAssessments();
   };
 
-  const startAssessment = (test) => {
+  const goBack = () => {
+    if (companyId) {
+      navigate(`/companies/${companyId}`);
+    } else {
+      navigate("/practice");
+    }
+  };
+
+  const startAssessment = (assessment) => {
     /*
-     * We do NOT create another screen here.
+     * IMPORTANT:
+     * We are not creating another screen yet.
      *
-     * The existing Assessment execution route can be connected later.
-     *
-     * For now we preserve the complete test context in navigation state.
+     * This route will be connected to the existing assessment
+     * execution/proctoring architecture in the next step.
      */
+
     navigate("/practice/assessments/test", {
       state: {
         companyId,
         company,
-        assessment: test,
+        assessment,
       },
     });
   };
 
-  const goBack = () => {
-    if (location.state?.fromCompany) {
-      navigate(`/companies/${companyId}`);
-      return;
-    }
-
-    navigate("/practice");
-  };
-
   return (
-    <View style={styles.screen}>
-      {/* Ambient background */}
-      <View style={styles.orbOne} />
-      <View style={styles.orbTwo} />
+    <div style={styles.page}>
+      <div style={styles.backgroundGlowOne} />
+      <div style={styles.backgroundGlowTwo} />
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.container}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#c9a7ff"
-          />
-        }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={goBack}
+      <div style={styles.container}>
+
+        {/* HEADER */}
+
+        <div style={styles.header}>
+          <button
+            onClick={goBack}
             style={styles.backButton}
-            activeOpacity={0.8}
           >
-            <Text style={styles.backText}>‹</Text>
-          </TouchableOpacity>
+            ←
+          </button>
 
-          <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>
+          <div style={styles.headerContent}>
+            <div style={styles.eyebrow}>
               PLACEMENT PRACTICE / APTITUDE
-            </Text>
+            </div>
 
-            <Text style={styles.title}>
+            <h1 style={styles.title}>
               Aptitude{" "}
-              <Text style={styles.titleAccent}>Lab</Text>
-            </Text>
+              <span style={styles.accent}>
+                Lab
+              </span>
+            </h1>
 
-            <Text style={styles.subtitle}>
-              Company-specific assessments. Practice without
-              unnecessary locks or artificial restrictions.
-            </Text>
-          </View>
+            <p style={styles.subtitle}>
+              Practice the aptitude patterns configured
+              specifically for {company.name}.
+            </p>
+          </div>
 
-          <View style={styles.companyBadge}>
-            <Text style={styles.companyLogo}>
-              {company.logo}
-            </Text>
-          </View>
-        </View>
+          <div style={styles.companyBadge}>
+            {company.logo}
+          </div>
+        </div>
 
-        {/* Company identity */}
-        <GlassCard style={styles.companyHero}>
-          <View style={styles.companyLogoLarge}>
-            <Text style={styles.companyLogoLargeText}>
-              {company.logo}
-            </Text>
-          </View>
+        {/* COMPANY HERO */}
 
-          <View style={styles.companyHeroInfo}>
-            <Text style={styles.companyLabel}>
+        <div style={styles.heroCard}>
+          <div style={styles.companyLogo}>
+            {company.logo}
+          </div>
+
+          <div style={styles.heroInfo}>
+            <div style={styles.smallLabel}>
               CURRENT COMPANY
-            </Text>
+            </div>
 
-            <Text style={styles.companyName}>
+            <div style={styles.companyName}>
               {company.name}
-            </Text>
+            </div>
 
-            <Text style={styles.companyDescription}>
-              Aptitude assessments mapped to the recruitment
-              pattern configured for this company.
-            </Text>
-          </View>
+            <div style={styles.companyDescription}>
+              Company-specific aptitude assessments,
+              generated from the ENGVIVA question database.
+            </div>
+          </div>
 
-          <View style={styles.livePill}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
-          </View>
-        </GlassCard>
+          <div style={styles.liveBadge}>
+            <span style={styles.liveDot} />
+            DATABASE LIVE
+          </div>
+        </div>
 
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          <GlassCard style={styles.statCard}>
-            <Text style={styles.statNumber}>
+        {/* STATS */}
+
+        <div style={styles.stats}>
+          <div style={styles.statCard}>
+            <div style={styles.statNumber}>
               {tests.length}
-            </Text>
-            <Text style={styles.statLabel}>
-              TESTS AVAILABLE
-            </Text>
-          </GlassCard>
+            </div>
+            <div style={styles.statLabel}>
+              AVAILABLE TESTS
+            </div>
+          </div>
 
-          <GlassCard style={styles.statCard}>
-            <Text style={styles.statNumber}>20</Text>
-            <Text style={styles.statLabel}>
-              TARGET QUESTIONS
-            </Text>
-          </GlassCard>
+          <div style={styles.statCard}>
+            <div style={styles.statNumber}>
+              20
+            </div>
+            <div style={styles.statLabel}>
+              QUESTIONS / TEST
+            </div>
+          </div>
 
-          <GlassCard style={styles.statCard}>
-            <Text style={styles.statNumber}>∞</Text>
-            <Text style={styles.statLabel}>
-              PRACTICE
-            </Text>
-          </GlassCard>
-        </View>
+          <div style={styles.statCard}>
+            <div style={styles.statNumber}>
+              ∞
+            </div>
+            <div style={styles.statLabel}>
+              PRACTICE ACCESS
+            </div>
+          </div>
+        </div>
 
-        {/* Error */}
-        {error && (
-          <GlassCard style={styles.errorCard}>
-            <Text style={styles.errorTitle}>
-              Assessment service unavailable
-            </Text>
+        {/* SECTION */}
 
-            <Text style={styles.errorText}>
-              {error}
-            </Text>
+        <div style={styles.sectionHeader}>
+          <div>
+            <div style={styles.sectionEyebrow}>
+              ASSESSMENT MODULES
+            </div>
 
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={loadAssessments}
-            >
-              <Text style={styles.retryText}>
-                RETRY
-              </Text>
-            </TouchableOpacity>
-          </GlassCard>
-        )}
+            <h2 style={styles.sectionTitle}>
+              Choose your test
+            </h2>
+          </div>
 
-        {/* Section */}
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionEyebrow}>
-              AVAILABLE MODULES
-            </Text>
-
-            <Text style={styles.sectionTitle}>
-              Choose your assessment
-            </Text>
-          </View>
-
-          <Text style={styles.sectionCount}>
+          <div style={styles.moduleCount}>
             {tests.length} MODULES
-          </Text>
-        </View>
+          </div>
+        </div>
 
-        {/* Loading */}
-        {loading && (
-          <GlassCard style={styles.loadingCard}>
-            <ActivityIndicator
-              size="large"
-              color="#c9a7ff"
-            />
+        {/* ERROR */}
 
-            <Text style={styles.loadingText}>
-              Loading company assessments...
-            </Text>
-          </GlassCard>
-        )}
+        {error && (
+          <div style={styles.errorCard}>
+            <div style={styles.errorTitle}>
+              Assessment service unavailable
+            </div>
 
-        {/* Empty */}
-        {!loading && !error && tests.length === 0 && (
-          <GlassCard style={styles.emptyCard}>
-            <View style={styles.emptyIcon}>
-              <Text style={styles.emptyIconText}>A</Text>
-            </View>
+            <div style={styles.errorText}>
+              {error}
+            </div>
 
-            <Text style={styles.emptyTitle}>
-              Assessments are being prepared
-            </Text>
-
-            <Text style={styles.emptyText}>
-              No aptitude assessments are currently available
-              for {company.name}. Once questions are uploaded
-              to the ENGVIVA assessment database, they will
-              appear here automatically.
-            </Text>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={loadAssessments}
+            <button
+              onClick={loadAssessments}
+              style={styles.retryButton}
             >
-              <Text style={styles.secondaryButtonText}>
-                CHECK AGAIN
-              </Text>
-            </TouchableOpacity>
-          </GlassCard>
+              RETRY
+            </button>
+          </div>
         )}
 
-        {/* Tests */}
+        {/* LOADING */}
+
+        {loading && (
+          <div style={styles.loadingCard}>
+            <div style={styles.spinner} />
+
+            <div style={styles.loadingText}>
+              Loading company assessments...
+            </div>
+          </div>
+        )}
+
+        {/* EMPTY */}
+
+        {!loading &&
+          !error &&
+          tests.length === 0 && (
+            <div style={styles.emptyCard}>
+              <div style={styles.emptyIcon}>
+                A
+              </div>
+
+              <h3 style={styles.emptyTitle}>
+                No assessments available
+              </h3>
+
+              <p style={styles.emptyText}>
+                The backend is reachable, but no aptitude
+                assessments were returned for {company.name}.
+                Once your question database is connected,
+                they will automatically appear here.
+              </p>
+
+              <button
+                onClick={refresh}
+                style={styles.secondaryButton}
+              >
+                CHECK AGAIN
+              </button>
+            </div>
+          )}
+
+        {/* TEST LIST */}
+
         {!loading &&
           tests.map((test, index) => (
-            <GlassCard
+            <div
               key={test.id}
               style={styles.testCard}
             >
-              <View style={styles.testTop}>
-                <View style={styles.testNumber}>
-                  <Text style={styles.testNumberText}>
-                    {String(index + 1).padStart(2, "0")}
-                  </Text>
-                </View>
+              <div style={styles.testHeader}>
 
-                <View style={styles.testInfo}>
-                  <View style={styles.testTitleRow}>
-                    <Text style={styles.testTitle}>
+                <div style={styles.testNumber}>
+                  {String(index + 1).padStart(2, "0")}
+                </div>
+
+                <div style={styles.testInfo}>
+                  <div style={styles.testTitleRow}>
+                    <h3 style={styles.testTitle}>
                       {test.title}
-                    </Text>
+                    </h3>
 
                     {test.completed && (
-                      <View style={styles.completedBadge}>
-                        <Text style={styles.completedText}>
-                          COMPLETED
-                        </Text>
-                      </View>
+                      <span style={styles.completedBadge}>
+                        COMPLETED
+                      </span>
                     )}
-                  </View>
+                  </div>
 
-                  <Text style={styles.testDescription}>
+                  <p style={styles.testDescription}>
                     {test.description}
-                  </Text>
-                </View>
-              </View>
+                  </p>
+                </div>
+              </div>
 
-              {/* Test metadata */}
-              <View style={styles.metaRow}>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaValue}>
+              <div style={styles.metadata}>
+
+                <div style={styles.meta}>
+                  <strong>
                     {test.questions}
-                  </Text>
+                  </strong>
 
-                  <Text style={styles.metaLabel}>
+                  <span>
                     QUESTIONS
-                  </Text>
-                </View>
+                  </span>
+                </div>
 
-                <View style={styles.metaDivider} />
+                <div style={styles.divider} />
 
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaValue}>
+                <div style={styles.meta}>
+                  <strong>
                     {test.duration}
-                  </Text>
+                  </strong>
 
-                  <Text style={styles.metaLabel}>
+                  <span>
                     MINUTES
-                  </Text>
-                </View>
+                  </span>
+                </div>
 
-                <View style={styles.metaDivider} />
+                <div style={styles.divider} />
 
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaValue}>
+                <div style={styles.meta}>
+                  <strong>
                     {test.difficulty}
-                  </Text>
+                  </strong>
 
-                  <Text style={styles.metaLabel}>
-                    LEVEL
-                  </Text>
-                </View>
-              </View>
+                  <span>
+                    DIFFICULTY
+                  </span>
+                </div>
 
-              {/* Action */}
-              <TouchableOpacity
-                activeOpacity={0.85}
+                {test.score !== null && (
+                  <>
+                    <div style={styles.divider} />
+
+                    <div style={styles.meta}>
+                      <strong>
+                        {test.score}%
+                      </strong>
+
+                      <span>
+                        LAST SCORE
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <button
+                onClick={() =>
+                  startAssessment(test)
+                }
                 style={styles.startButton}
-                onPress={() => startAssessment(test)}
               >
-                <Text style={styles.startButtonText}>
+                <span>
                   {test.completed
                     ? "PRACTICE AGAIN"
                     : "START ASSESSMENT"}
-                </Text>
+                </span>
 
-                <Text style={styles.arrow}>
+                <span style={styles.startArrow}>
                   →
-                </Text>
-              </TouchableOpacity>
-            </GlassCard>
+                </span>
+              </button>
+            </div>
           ))}
 
-        {/* Bottom note */}
-        {!loading && tests.length > 0 && (
-          <View style={styles.bottomNote}>
-            <View style={styles.securityDot} />
+        {/* REFRESH */}
 
-            <Text style={styles.bottomNoteText}>
-              Assessment activity, scores and performance
-              analytics are stored against your ENGVIVA
-              profile.
-            </Text>
-          </View>
+        {!loading && (
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            style={styles.refreshButton}
+          >
+            {refreshing
+              ? "REFRESHING..."
+              : "↻ REFRESH ASSESSMENTS"}
+          </button>
         )}
-      </ScrollView>
-    </View>
+
+        <div style={styles.footerNote}>
+          ENGVIVA · Assessment activity and performance
+          will be connected to your candidate profile.
+        </div>
+      </div>
+    </div>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
+const styles = {
+  page: {
     minHeight: "100vh",
-    backgroundColor: "#07060c",
-    overflow: "hidden",
+    width: "100%",
+    background:
+      "radial-gradient(circle at 80% 10%, rgba(150,100,255,.12), transparent 30%), #07060c",
+    color: "#fff",
+    position: "relative",
+    overflowX: "hidden",
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
 
-  scroll: {
-    flex: 1,
+  backgroundGlowOne: {
+    position: "fixed",
+    width: 420,
+    height: 420,
+    borderRadius: "50%",
+    background: "rgba(172,120,255,.08)",
+    filter: "blur(100px)",
+    top: -180,
+    right: -100,
+    pointerEvents: "none",
+  },
+
+  backgroundGlowTwo: {
+    position: "fixed",
+    width: 360,
+    height: 360,
+    borderRadius: "50%",
+    background: "rgba(100,80,255,.06)",
+    filter: "blur(100px)",
+    bottom: -150,
+    left: -100,
+    pointerEvents: "none",
   },
 
   container: {
-    width: "100%",
-    maxWidth: 1250,
-    alignSelf: "center",
-    paddingHorizontal: 34,
-    paddingTop: 34,
-    paddingBottom: 80,
-  },
-
-  orbOne: {
-    position: "absolute",
-    width: 420,
-    height: 420,
-    borderRadius: 210,
-    backgroundColor: "rgba(177, 125, 255, 0.09)",
-    top: -160,
-    right: -100,
-    filter: "blur(80px)",
-  },
-
-  orbTwo: {
-    position: "absolute",
-    width: 350,
-    height: 350,
-    borderRadius: 175,
-    backgroundColor: "rgba(103, 82, 255, 0.06)",
-    bottom: -120,
-    left: -100,
-    filter: "blur(90px)",
+    position: "relative",
+    width: "min(1200px, calc(100% - 48px))",
+    margin: "0 auto",
+    padding: "38px 0 70px",
+    zIndex: 1,
   },
 
   header: {
-    flexDirection: "row",
+    display: "flex",
     alignItems: "center",
     gap: 20,
     marginBottom: 28,
@@ -672,231 +599,321 @@ const styles = StyleSheet.create({
   backButton: {
     width: 48,
     height: 48,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.045)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  backText: {
+    borderRadius: 15,
+    border: "1px solid rgba(255,255,255,.09)",
+    background: "rgba(255,255,255,.04)",
     color: "#fff",
-    fontSize: 34,
-    lineHeight: 34,
-    marginTop: -4,
+    fontSize: 22,
+    cursor: "pointer",
   },
 
-  headerText: {
+  headerContent: {
     flex: 1,
   },
 
   eyebrow: {
-    color: "#a996c8",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 2.5,
-    marginBottom: 6,
+    fontSize: 10,
+    fontWeight: 800,
+    letterSpacing: 2.4,
+    color: "#9887ae",
   },
 
   title: {
-    color: "#fff",
-    fontSize: 40,
-    fontWeight: "900",
+    margin: "5px 0 0",
+    fontSize: "clamp(32px, 5vw, 46px)",
+    lineHeight: 1,
     letterSpacing: -1.5,
+    fontWeight: 900,
   },
 
-  titleAccent: {
+  accent: {
     color: "#c9a7ff",
   },
 
   subtitle: {
-    color: "#8f8a99",
-    fontSize: 14,
-    marginTop: 7,
+    margin: "9px 0 0",
     maxWidth: 680,
-    lineHeight: 21,
+    color: "#89838f",
+    fontSize: 14,
+    lineHeight: 1.6,
   },
 
   companyBadge: {
     width: 58,
     height: 58,
     borderRadius: 19,
-    backgroundColor: "rgba(201,167,255,0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(201,167,255,0.25)",
+    display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    background: "rgba(201,167,255,.1)",
+    border: "1px solid rgba(201,167,255,.22)",
+    color: "#d6c0ff",
+    fontWeight: 900,
+    fontSize: 21,
+  },
+
+  heroCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 20,
+    padding: 24,
+    borderRadius: 25,
+    background: "rgba(255,255,255,.035)",
+    border: "1px solid rgba(255,255,255,.075)",
+    backdropFilter: "blur(22px)",
+    marginBottom: 16,
   },
 
   companyLogo: {
-    color: "#d9c4ff",
-    fontSize: 21,
-    fontWeight: "900",
-  },
-
-  glassCard: {
-    backgroundColor: "rgba(255,255,255,0.035)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.075)",
-    borderRadius: 24,
-    backdropFilter: "blur(22px)",
-  },
-
-  companyHero: {
-    padding: 25,
-    flexDirection: "row",
+    width: 70,
+    height: 70,
+    borderRadius: 21,
+    display: "flex",
     alignItems: "center",
-    gap: 20,
-    marginBottom: 18,
-  },
-
-  companyLogoLarge: {
-    width: 74,
-    height: 74,
-    borderRadius: 22,
-    backgroundColor: "rgba(201,167,255,0.11)",
-    borderWidth: 1,
-    borderColor: "rgba(201,167,255,0.23)",
     justifyContent: "center",
-    alignItems: "center",
-  },
-
-  companyLogoLargeText: {
+    background: "rgba(201,167,255,.1)",
+    border: "1px solid rgba(201,167,255,.2)",
     color: "#d7c1ff",
     fontSize: 28,
-    fontWeight: "900",
+    fontWeight: 900,
   },
 
-  companyHeroInfo: {
+  heroInfo: {
     flex: 1,
   },
 
-  companyLabel: {
-    color: "#8d829c",
-    fontSize: 10,
-    fontWeight: "800",
+  smallLabel: {
+    fontSize: 9,
     letterSpacing: 2,
+    fontWeight: 800,
+    color: "#81798d",
   },
 
   companyName: {
-    color: "#fff",
+    marginTop: 4,
     fontSize: 27,
-    fontWeight: "900",
-    marginTop: 3,
+    fontWeight: 900,
   },
 
   companyDescription: {
-    color: "#9993a2",
-    fontSize: 13,
-    lineHeight: 19,
     marginTop: 4,
+    color: "#8b8592",
+    fontSize: 13,
+    lineHeight: 1.5,
   },
 
-  livePill: {
-    flexDirection: "row",
+  liveBadge: {
+    display: "flex",
     alignItems: "center",
     gap: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    padding: "8px 12px",
     borderRadius: 20,
-    backgroundColor: "rgba(201,167,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(201,167,255,0.16)",
+    background: "rgba(201,167,255,.07)",
+    border: "1px solid rgba(201,167,255,.15)",
+    color: "#c9a7ff",
+    fontSize: 9,
+    fontWeight: 900,
+    letterSpacing: 1,
   },
 
   liveDot: {
     width: 7,
     height: 7,
-    borderRadius: 4,
-    backgroundColor: "#c9a7ff",
+    borderRadius: "50%",
+    background: "#c9a7ff",
+    boxShadow: "0 0 12px #c9a7ff",
   },
 
-  liveText: {
-    color: "#c9a7ff",
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-
-  statsRow: {
-    flexDirection: "row",
+  stats: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
     gap: 14,
-    marginBottom: 38,
+    marginBottom: 40,
   },
 
   statCard: {
-    flex: 1,
-    padding: 19,
+    padding: 20,
+    borderRadius: 20,
+    background: "rgba(255,255,255,.025)",
+    border: "1px solid rgba(255,255,255,.065)",
   },
 
   statNumber: {
-    color: "#fff",
-    fontSize: 27,
-    fontWeight: "900",
+    fontSize: 28,
+    fontWeight: 900,
   },
 
   statLabel: {
-    color: "#817b8a",
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 1.2,
     marginTop: 4,
+    color: "#706a77",
+    fontSize: 9,
+    letterSpacing: 1.3,
+    fontWeight: 800,
   },
 
   sectionHeader: {
-    flexDirection: "row",
+    display: "flex",
     alignItems: "flex-end",
     justifyContent: "space-between",
     marginBottom: 18,
   },
 
   sectionEyebrow: {
-    color: "#9887ae",
-    fontSize: 10,
-    fontWeight: "800",
+    color: "#9786ad",
+    fontSize: 9,
     letterSpacing: 2,
+    fontWeight: 800,
   },
 
   sectionTitle: {
-    color: "#fff",
+    margin: "5px 0 0",
     fontSize: 24,
-    fontWeight: "900",
-    marginTop: 5,
+    fontWeight: 900,
   },
 
-  sectionCount: {
-    color: "#766d80",
-    fontSize: 10,
-    fontWeight: "800",
+  moduleCount: {
+    color: "#6d6675",
+    fontSize: 9,
+    fontWeight: 800,
     letterSpacing: 1,
   },
 
-  testCard: {
-    padding: 23,
-    marginBottom: 15,
+  errorCard: {
+    padding: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    border: "1px solid rgba(255,100,100,.16)",
+    background: "rgba(255,80,80,.035)",
   },
 
-  testTop: {
-    flexDirection: "row",
+  errorTitle: {
+    fontWeight: 800,
+    fontSize: 15,
+  },
+
+  errorText: {
+    marginTop: 5,
+    color: "#918a97",
+    fontSize: 12,
+  },
+
+  retryButton: {
+    marginTop: 13,
+    padding: "9px 15px",
+    borderRadius: 10,
+    border: "1px solid rgba(201,167,255,.2)",
+    background: "rgba(201,167,255,.08)",
+    color: "#c9a7ff",
+    fontWeight: 900,
+    fontSize: 9,
+    cursor: "pointer",
+  },
+
+  loadingCard: {
+    minHeight: 220,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 24,
+    background: "rgba(255,255,255,.03)",
+    border: "1px solid rgba(255,255,255,.06)",
+  },
+
+  spinner: {
+    width: 30,
+    height: 30,
+    borderRadius: "50%",
+    border: "3px solid rgba(201,167,255,.15)",
+    borderTopColor: "#c9a7ff",
+    animation: "engviva-spin 1s linear infinite",
+  },
+
+  loadingText: {
+    marginTop: 14,
+    color: "#85808c",
+    fontSize: 13,
+  },
+
+  emptyCard: {
+    padding: 45,
+    textAlign: "center",
+    borderRadius: 24,
+    background: "rgba(255,255,255,.03)",
+    border: "1px solid rgba(255,255,255,.06)",
+  },
+
+  emptyIcon: {
+    width: 65,
+    height: 65,
+    margin: "0 auto 16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    background: "rgba(201,167,255,.08)",
+    border: "1px solid rgba(201,167,255,.15)",
+    color: "#c9a7ff",
+    fontSize: 26,
+    fontWeight: 900,
+  },
+
+  emptyTitle: {
+    margin: 0,
+    fontSize: 19,
+    fontWeight: 800,
+  },
+
+  emptyText: {
+    maxWidth: 650,
+    margin: "9px auto 0",
+    color: "#85808d",
+    fontSize: 13,
+    lineHeight: 1.6,
+  },
+
+  secondaryButton: {
+    marginTop: 20,
+    padding: "11px 18px",
+    borderRadius: 12,
+    background: "rgba(201,167,255,.08)",
+    border: "1px solid rgba(201,167,255,.2)",
+    color: "#c9a7ff",
+    fontSize: 9,
+    fontWeight: 900,
+    letterSpacing: 1,
+    cursor: "pointer",
+  },
+
+  testCard: {
+    marginBottom: 15,
+    padding: 23,
+    borderRadius: 24,
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,.045), rgba(255,255,255,.018))",
+    border: "1px solid rgba(255,255,255,.075)",
+    backdropFilter: "blur(20px)",
+  },
+
+  testHeader: {
+    display: "flex",
     gap: 17,
   },
 
   testNumber: {
     width: 48,
     height: 48,
+    flexShrink: 0,
     borderRadius: 15,
-    backgroundColor: "rgba(201,167,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(201,167,255,0.14)",
-    justifyContent: "center",
+    display: "flex",
     alignItems: "center",
-  },
-
-  testNumberText: {
+    justifyContent: "center",
+    background: "rgba(201,167,255,.08)",
+    border: "1px solid rgba(201,167,255,.14)",
     color: "#c9a7ff",
-    fontSize: 13,
-    fontWeight: "900",
+    fontSize: 12,
+    fontWeight: 900,
   },
 
   testInfo: {
@@ -904,218 +921,131 @@ const styles = StyleSheet.create({
   },
 
   testTitleRow: {
-    flexDirection: "row",
+    display: "flex",
     alignItems: "center",
     gap: 10,
     flexWrap: "wrap",
   },
 
   testTitle: {
-    color: "#fff",
+    margin: 0,
     fontSize: 18,
-    fontWeight: "800",
-  },
-
-  testDescription: {
-    color: "#8d8993",
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 5,
+    fontWeight: 800,
   },
 
   completedBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: "rgba(201,167,255,0.09)",
-  },
-
-  completedText: {
+    padding: "4px 8px",
+    borderRadius: 9,
+    background: "rgba(201,167,255,.08)",
     color: "#c9a7ff",
     fontSize: 8,
-    fontWeight: "900",
+    fontWeight: 900,
     letterSpacing: 1,
   },
 
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 21,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "rgba(255,255,255,0.055)",
+  testDescription: {
+    margin: "5px 0 0",
+    color: "#85808c",
+    fontSize: 12,
+    lineHeight: 1.55,
   },
 
-  metaItem: {
+  metadata: {
+    display: "flex",
+    alignItems: "center",
+    marginTop: 20,
+    padding: "15px 0",
+    borderTop: "1px solid rgba(255,255,255,.055)",
+    borderBottom: "1px solid rgba(255,255,255,.055)",
+  },
+
+  meta: {
     flex: 1,
-    alignItems: "center",
+    textAlign: "center",
   },
 
-  metaValue: {
-    color: "#e9e4ee",
-    fontSize: 15,
-    fontWeight: "800",
-    textTransform: "uppercase",
+  metaStrong: {
+    color: "#fff",
   },
 
-  metaLabel: {
-    color: "#6f6977",
-    fontSize: 8,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginTop: 4,
-  },
-
-  metaDivider: {
+  divider: {
     width: 1,
     height: 30,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    background: "rgba(255,255,255,.07)",
   },
 
   startButton: {
-    marginTop: 17,
-    minHeight: 49,
-    borderRadius: 15,
-    backgroundColor: "#c9a7ff",
-    paddingHorizontal: 19,
-    flexDirection: "row",
+    width: "100%",
+    marginTop: 16,
+    minHeight: 48,
+    border: 0,
+    borderRadius: 14,
+    background:
+      "linear-gradient(135deg, #d8c0ff, #b895f5)",
+    color: "#170d22",
+    display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-
-  startButtonText: {
-    color: "#160e20",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-  },
-
-  arrow: {
-    color: "#160e20",
-    fontSize: 22,
-    fontWeight: "700",
-  },
-
-  loadingCard: {
-    padding: 50,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  loadingText: {
-    color: "#85808d",
-    marginTop: 14,
-    fontSize: 13,
-  },
-
-  emptyCard: {
-    padding: 40,
-    alignItems: "center",
-  },
-
-  emptyIcon: {
-    width: 66,
-    height: 66,
-    borderRadius: 20,
-    backgroundColor: "rgba(201,167,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(201,167,255,0.16)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 17,
-  },
-
-  emptyIconText: {
-    color: "#c9a7ff",
-    fontSize: 26,
-    fontWeight: "900",
-  },
-
-  emptyTitle: {
-    color: "#fff",
-    fontSize: 19,
-    fontWeight: "800",
-  },
-
-  emptyText: {
-    color: "#85808c",
-    fontSize: 13,
-    lineHeight: 20,
-    maxWidth: 600,
-    textAlign: "center",
-    marginTop: 8,
-  },
-
-  secondaryButton: {
-    marginTop: 20,
-    borderRadius: 13,
-    borderWidth: 1,
-    borderColor: "rgba(201,167,255,0.25)",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-
-  secondaryButtonText: {
-    color: "#c9a7ff",
+    padding: "0 18px",
     fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1,
+    fontWeight: 900,
+    letterSpacing: 1.1,
+    cursor: "pointer",
+    boxShadow:
+      "0 10px 35px rgba(185,145,255,.12)",
   },
 
-  errorCard: {
-    padding: 20,
-    marginBottom: 25,
-    borderColor: "rgba(255,120,120,0.16)",
+  startArrow: {
+    fontSize: 20,
   },
 
-  errorTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-
-  errorText: {
-    color: "#918b97",
-    fontSize: 12,
-    marginTop: 5,
-  },
-
-  retryButton: {
-    alignSelf: "flex-start",
-    marginTop: 13,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: "rgba(201,167,255,0.1)",
-  },
-
-  retryText: {
-    color: "#c9a7ff",
+  refreshButton: {
+    display: "block",
+    margin: "22px auto 0",
+    padding: "11px 18px",
+    borderRadius: 12,
+    background: "transparent",
+    border: "1px solid rgba(255,255,255,.08)",
+    color: "#77717f",
     fontSize: 9,
-    fontWeight: "900",
+    fontWeight: 800,
     letterSpacing: 1,
+    cursor: "pointer",
   },
 
-  bottomNote: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginTop: 15,
-    paddingHorizontal: 4,
-  },
-
-  securityDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#c9a7ff",
-  },
-
-  bottomNoteText: {
-    flex: 1,
-    color: "#625d69",
+  footerNote: {
+    textAlign: "center",
+    marginTop: 25,
+    color: "#504b56",
     fontSize: 10,
-    lineHeight: 16,
   },
-});
+};
+
+/*
+ * Web animation.
+ *
+ * We inject this once because this file is intentionally self-contained.
+ */
+if (
+  typeof document !== "undefined" &&
+  !document.getElementById("engviva-assessment-animation")
+) {
+  const style = document.createElement("style");
+
+  style.id = "engviva-assessment-animation";
+
+  style.textContent = `
+    @keyframes engviva-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 700px) {
+      .engviva-assessment-mobile {
+        display: block;
+      }
+    }
+  `;
+
+  document.head.appendChild(style);
+}
