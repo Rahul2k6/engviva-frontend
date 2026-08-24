@@ -1,4 +1,5 @@
 ﻿import React, {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -11,14 +12,32 @@ import {
 
 import { auth } from "../firebase";
 
+/* =========================================================
+   CONFIG
+========================================================= */
+
 const API_BASE =
   import.meta.env.VITE_API_URL ||
   "https://engviva-backend.onrender.com";
 
+/*
+  IMPORTANT
+
+  This page intentionally DOES NOT call:
+
+      /api/role-preparation
+
+  The CompanyDetails screen is only a company hub.
+
+  Heavy question retrieval happens after entering
+  Aptitude / Technical / Coding / Interview.
+*/
+
 /* =========================================================
-   FALLBACK DATA
-   Backend / Firestore takes priority.
+   FALLBACK COMPANY DATA
+   Used only if backend company endpoint is unavailable.
 ========================================================= */
+
 const FALLBACK_COMPANIES = {
   google: {
     id: "google",
@@ -26,77 +45,14 @@ const FALLBACK_COMPANIES = {
     domain: "google.com",
     category: "Technology",
     description:
-      "A role-focused engineering preparation environment covering software, data, cloud and AI-oriented pathways.",
+      "Software, cloud, artificial intelligence, data and large-scale engineering preparation.",
     headquarters: "Mountain View, California",
-    color: "#4285F4",
     roles: [
       "Software Engineer",
       "Data Engineer",
       "ML Engineer",
       "Cloud Engineer",
       "DevOps Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Fundamentals",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Reasoning, quantitative ability and engineering fundamentals.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Core CS concepts, engineering fundamentals and role-specific knowledge.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Assessment",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Problem solving, algorithms, complexity and implementation.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Technical Interview",
-        type: "INTERVIEW",
-        description:
-          "Engineering reasoning, communication and technical depth.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "A timed, role-specific interview simulation with adaptive evaluation.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -106,77 +62,14 @@ const FALLBACK_COMPANIES = {
     domain: "microsoft.com",
     category: "Technology",
     description:
-      "Software, cloud, AI, infrastructure and enterprise engineering roles.",
+      "Software engineering, cloud, AI, infrastructure and enterprise technology preparation.",
     headquarters: "Redmond, Washington",
-    color: "#7FBA00",
     roles: [
       "Software Engineer",
       "Cloud Engineer",
       "AI Engineer",
       "DevOps Engineer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Assessment & Logic",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Analytical reasoning, CS fundamentals, and logic evaluation.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Data structures, system architecture, OS, and cloud fundamentals.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Algorithm design, clean code practices, and edge-case handling.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Technical Interview",
-        type: "INTERVIEW",
-        description:
-          "Deep dive into algorithms, system design, and past projects.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Behavioral evaluation, leadership principles, and cultural alignment.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -186,76 +79,14 @@ const FALLBACK_COMPANIES = {
     domain: "amazon.com",
     category: "Technology",
     description:
-      "Large-scale software, cloud, infrastructure and data engineering.",
+      "Software, cloud, distributed systems, data and large-scale engineering preparation.",
     headquarters: "Seattle, Washington",
-    color: "#FF9900",
     roles: [
       "Software Development Engineer",
       "Cloud Engineer",
       "Data Engineer",
       "DevOps Engineer",
       "Solutions Architect",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Assessment (OA1)",
-        shortTitle: "OA 1",
-        type: "ASSESSMENT",
-        description: "Code debugging, logic reasoning, and CS foundations.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "coding",
-        number: 2,
-        title: "Coding Assessment (OA2)",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Data structures, algorithms, and Leadership Principle work simulations.",
-        duration: "70 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "technical",
-        number: 3,
-        title: "System Design & Low-Level Design",
-        shortTitle: "Design",
-        type: "ASSESSMENT",
-        description:
-          "Object-oriented design, scalability, and distributed systems.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Live coding, problem-solving efficiency, and technical trade-offs.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "Bar Raiser",
-        type: "AI INTERVIEW",
-        description:
-          "Amazon Leadership Principles and customer obsession evaluation.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -265,76 +96,13 @@ const FALLBACK_COMPANIES = {
     domain: "apple.com",
     category: "Technology",
     description:
-      "Software, systems, hardware and platform engineering opportunities.",
+      "Software, systems, platform, mobile and machine-learning engineering preparation.",
     headquarters: "Cupertino, California",
-    color: "#A3AAAE",
     roles: [
       "Software Engineer",
       "iOS Developer",
       "Systems Engineer",
       "ML Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "CS & Systems Fundamentals",
-        shortTitle: "Fundamentals",
-        type: "ASSESSMENT",
-        description:
-          "Memory management, computer architecture, and OS principles.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Domain Technical Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Platform architecture, concurrency, and performance tuning.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding & Data Structures",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Clean, optimized algorithmic problem solving in C++, Swift, or Java.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "System Architecture Interview",
-        shortTitle: "Tech Interview",
-        type: "INTERVIEW",
-        description:
-          "Deep systems reasoning, hardware-software boundary, and code review.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI Culture",
-        type: "AI INTERVIEW",
-        description:
-          "Attention to detail, engineering excellence, and behavioral alignment.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -343,75 +111,14 @@ const FALLBACK_COMPANIES = {
     name: "Meta",
     domain: "meta.com",
     category: "Technology",
-    description: "Software, AI, infrastructure and product engineering roles.",
+    description:
+      "Software, AI, infrastructure, backend and product engineering preparation.",
     headquarters: "Menlo Park, California",
-    color: "#0866FF",
     roles: [
       "Software Engineer",
       "ML Engineer",
       "Data Engineer",
       "Infrastructure Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Technical Screening Assessment",
-        shortTitle: "Screening",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative aptitude, computational logic, and CS basics.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "coding",
-        number: 2,
-        title: "Speed Coding Round",
-        shortTitle: "Coding 1",
-        type: "CODING",
-        description: "Solving 2 algorithmic problems within a 45-minute window.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "technical",
-        number: 3,
-        title: "System Design & Architecture",
-        shortTitle: "Sys Design",
-        type: "ASSESSMENT",
-        description:
-          "High-throughput systems, caching, storage, and API design.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Architecture Interview",
-        shortTitle: "Interview",
-        type: "INTERVIEW",
-        description:
-          "Live code implementation and technical architecture defense.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Fast-paced decision making, project ownership, and behavioral evaluation.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -420,76 +127,14 @@ const FALLBACK_COMPANIES = {
     name: "NVIDIA",
     domain: "nvidia.com",
     category: "AI & Semiconductor",
-    description: "AI, GPU computing, systems and semiconductor engineering.",
+    description:
+      "GPU computing, artificial intelligence, systems and high-performance engineering preparation.",
     headquarters: "Santa Clara, California",
-    color: "#76B900",
     roles: [
       "Software Engineer",
       "AI Engineer",
       "ML Engineer",
       "Systems Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Math & Systems Foundations",
-        shortTitle: "Math & Logic",
-        type: "ASSESSMENT",
-        description:
-          "Linear algebra, probability, OS internals, and hardware basics.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Parallel & GPU Architecture",
-        shortTitle: "Architecture",
-        type: "ASSESSMENT",
-        description:
-          "Concurrency, memory models, CUDA principles, and compiler optimization.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Systems & Algorithms Coding",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Low-level C/C++ memory optimization and algorithm implementation.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Deep-Dive Interview",
-        shortTitle: "Deep Dive",
-        type: "INTERVIEW",
-        description:
-          "Detailed discussion on computing hardware, drivers, or ML models.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Research mindset, innovation agility, and technical collaboration.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -498,77 +143,15 @@ const FALLBACK_COMPANIES = {
     name: "IBM",
     domain: "ibm.com",
     category: "Technology",
-    description: "Enterprise software, cloud, AI, cybersecurity and consulting.",
+    description:
+      "Enterprise software, cloud, AI, cybersecurity and consulting engineering preparation.",
     headquarters: "Armonk, New York",
-    color: "#0F62FE",
     roles: [
       "Software Engineer",
       "Cloud Engineer",
       "Data Engineer",
       "AI Engineer",
       "Cybersecurity Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Cognitive Ability Assessment",
-        shortTitle: "Cognitive",
-        type: "ASSESSMENT",
-        description:
-          "Game-based cognitive challenge, logical reasoning, and aptitude.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical & Cloud Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Enterprise architectures, databases, cloud, and security basics.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Assessment",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Algorithm design, data structures, and object-oriented paradigms.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Problem solving, domain specialization, and practical project reviews.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Client-facing readiness, problem ownership, and corporate adaptability.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -578,76 +161,13 @@ const FALLBACK_COMPANIES = {
     domain: "oracle.com",
     category: "Enterprise",
     description:
-      "Cloud infrastructure, enterprise software and database engineering.",
+      "Cloud infrastructure, databases, enterprise software and backend engineering preparation.",
     headquarters: "Austin, Texas",
-    color: "#F80000",
     roles: [
       "Software Engineer",
       "Cloud Engineer",
       "Database Engineer",
       "DevOps Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Core CS",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Reasoning, CS fundamental MCQs (DBMS, OS, Networks, OOP).",
-        duration: "40 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Database & Cloud Architecture",
-        shortTitle: "Database",
-        type: "ASSESSMENT",
-        description:
-          "SQL indexing, normalization, concurrency, and cloud infrastructure.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Data structures, string manipulation, trees, and dynamic programming.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Interview",
-        type: "INTERVIEW",
-        description:
-          "Database internals, scalable backend architecture, and live coding.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Enterprise adaptability, communication, and situational judgment.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -657,75 +177,13 @@ const FALLBACK_COMPANIES = {
     domain: "salesforce.com",
     category: "SaaS",
     description:
-      "Cloud software, platform engineering and enterprise applications.",
+      "Cloud software, enterprise applications, platform and backend engineering preparation.",
     headquarters: "San Francisco, California",
-    color: "#00A1E0",
     roles: [
       "Software Engineer",
       "Backend Developer",
       "Cloud Engineer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Assessment (OA)",
-        shortTitle: "Online Test",
-        type: "ASSESSMENT",
-        description: "HackerRank assessment covering CS fundamentals and DSA.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "SaaS & Cloud Design",
-        shortTitle: "SaaS Design",
-        type: "ASSESSMENT",
-        description:
-          "Multi-tenant architecture, RESTful API design, and asynchronous patterns.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Data Structures & Algorithms",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Complex algorithmic problem solving and modular code design.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Object-oriented modeling, system scalability, and code walkthrough.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI Ohana",
-        type: "AI INTERVIEW",
-        description:
-          "Trust, customer success, innovation, and equality core values.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -735,76 +193,13 @@ const FALLBACK_COMPANIES = {
     domain: "adobe.com",
     category: "Technology",
     description:
-      "Creative software, cloud products, AI and platform engineering.",
+      "Creative software, cloud products, AI and platform engineering preparation.",
     headquarters: "San Jose, California",
-    color: "#FF0000",
     roles: [
       "Software Engineer",
       "Frontend Developer",
       "Backend Developer",
       "ML Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Math Challenge",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative aptitude, discrete mathematics, and CS basics.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Core CS & Graphics/Web Systems",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Data structures, memory optimization, graphics pipelines, or web engines.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Advanced Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Advanced data structures (trees, graphs, DP) and modular solutions.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Interview",
-        type: "INTERVIEW",
-        description:
-          "Architecture evaluation, live coding, and algorithm optimization.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Creative problem solving, teamwork, and product-minded mindset.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -814,76 +209,13 @@ const FALLBACK_COMPANIES = {
     domain: "cisco.com",
     category: "Networking",
     description:
-      "Networking, cybersecurity, cloud and infrastructure engineering.",
+      "Networking, cybersecurity, cloud and infrastructure engineering preparation.",
     headquarters: "San Jose, California",
-    color: "#1BA0D7",
     roles: [
       "Network Engineer",
       "Software Engineer",
       "Cybersecurity Engineer",
       "Cloud Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Networking Basics",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Logical reasoning, OSI model, TCP/IP, and switching concepts.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Systems & Network Protocols",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Socket programming, network security, packet routing, and OS concepts.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Assessment",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Data structures, bit manipulation, strings, and graph algorithms.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Network architecture discussions, debugging protocols, and code walkthrough.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Problem ownership, ethical compliance, and behavioral communication.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -892,76 +224,14 @@ const FALLBACK_COMPANIES = {
     name: "Intel",
     domain: "intel.com",
     category: "Semiconductor",
-    description: "Processors, systems, software and semiconductor engineering.",
+    description:
+      "Processors, systems, embedded software and semiconductor engineering preparation.",
     headquarters: "Santa Clara, California",
-    color: "#0071C5",
     roles: [
       "Software Engineer",
       "Systems Engineer",
       "Embedded Engineer",
       "AI Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Digital Logic",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative ability, logic gates, binary systems, and microprocessor basics.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Computer Architecture & C",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Paging, cache coherence, assembly/C fundamentals, and device drivers.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Systems Coding Assessment",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Low-level memory management, pointers, linked lists, and algorithms.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Hardware/Software Technical Interview",
-        shortTitle: "Tech Interview",
-        type: "INTERVIEW",
-        description:
-          "Deep exploration of hardware-software co-design, OS, and debugging.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Analytical tenacity, team dynamics, and engineering ethics.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -971,77 +241,14 @@ const FALLBACK_COMPANIES = {
     domain: "accenture.com",
     category: "Consulting",
     description:
-      "Technology consulting, cloud, data, AI and enterprise engineering.",
+      "Technology consulting, cloud, data, AI and enterprise engineering preparation.",
     headquarters: "Dublin, Ireland",
-    color: "#A100FF",
     roles: [
       "Software Engineer",
       "Cloud Engineer",
       "Data Engineer",
       "DevOps Engineer",
       "Cybersecurity Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Cognitive & Critical Reasoning",
-        shortTitle: "Cognitive",
-        type: "ASSESSMENT",
-        description:
-          "English ability, critical thinking, abstract reasoning, and numerical ability.",
-        duration: "40 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Pseudo-code analysis, common cloud applications, and network security basics.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Assessment",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Basic to intermediate algorithmic problems in any preferred language.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Communication Assessment",
-        shortTitle: "Communication",
-        type: "ASSESSMENT",
-        description:
-          "Automated oral fluency, vocabulary, pronunciation, and listening.",
-        duration: "20 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Consulting aptitude, client-handling scenarios, and project readiness.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1051,76 +258,13 @@ const FALLBACK_COMPANIES = {
     domain: "deloitte.com",
     category: "Consulting",
     description:
-      "Technology consulting, analytics, cloud and enterprise solutions.",
+      "Technology consulting, analytics, cloud and enterprise technology preparation.",
     headquarters: "London, United Kingdom",
-    color: "#86BC25",
     roles: [
       "Software Engineer",
       "Data Analyst",
       "Cloud Engineer",
       "Cybersecurity Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Versant Test",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative, logical, and verbal communication competencies.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "IT & Domain Knowledge",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Databases, SDLC, object-oriented concepts, and cloud computing.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding & Logic Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Data structures and algorithmic coding with strong focus on edge cases.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical & Case Interview",
-        shortTitle: "Case Tech",
-        type: "INTERVIEW",
-        description:
-          "Technical discussions, business case solving, and architecture design.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Consulting etiquette, leadership qualities, and cultural compatibility.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1130,76 +274,13 @@ const FALLBACK_COMPANIES = {
     domain: "tcs.com",
     category: "Indian IT",
     description:
-      "IT services, software engineering, cloud and enterprise technology.",
+      "IT services, software engineering, cloud and enterprise technology preparation.",
     headquarters: "Mumbai, India",
-    color: "#0056A6",
     roles: [
       "Software Engineer",
       "System Engineer",
       "Cloud Engineer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "TCS NQT Foundation",
-        shortTitle: "NQT Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Numerical ability, verbal ability, and reasoning capability.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Advanced CS & Technical MCQ",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Pseudo-code, algorithms, DBMS, operating systems, and computer networks.",
-        duration: "40 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "TCS Advanced Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Two coding questions (Ninja and Digital track standard problems).",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview (TR)",
-        shortTitle: "TR Round",
-        type: "INTERVIEW",
-        description:
-          "Core programming, academic project review, and technical fundamentals.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "MR & HR",
-        type: "AI INTERVIEW",
-        description:
-          "Managerial and HR behavioral assessment with adaptive questions.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1209,75 +290,13 @@ const FALLBACK_COMPANIES = {
     domain: "infosys.com",
     category: "Indian IT",
     description:
-      "Digital engineering, consulting, cloud and enterprise technology.",
+      "Digital engineering, consulting, cloud and enterprise technology preparation.",
     headquarters: "Bengaluru, India",
-    color: "#007CC3",
     roles: [
       "Systems Engineer",
       "Software Engineer",
       "Data Engineer",
       "DevOps Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Reasoning",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative ability, logical reasoning and verbal fundamentals.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Programming fundamentals, databases, operating systems and networks.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Algorithmic thinking and implementation under time constraints.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "technical-interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Interview",
-        type: "INTERVIEW",
-        description: "Role-specific technical discussion and problem solving.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Adaptive interview simulation evaluating technical communication and decision making.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1286,75 +305,14 @@ const FALLBACK_COMPANIES = {
     name: "Wipro",
     domain: "wipro.com",
     category: "Indian IT",
-    description: "IT services, cloud, cybersecurity and digital engineering.",
+    description:
+      "IT services, cloud, cybersecurity and digital engineering preparation.",
     headquarters: "Bengaluru, India",
-    color: "#341F6E",
     roles: [
       "Project Engineer",
       "Software Engineer",
       "Cloud Engineer",
       "Cybersecurity Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "NLTH Aptitude & Verbal",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description: "Quantitative, logical reasoning, and verbal comprehension.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Written Communication (Essay/Technical)",
-        shortTitle: "Written Test",
-        type: "ASSESSMENT",
-        description:
-          "Written communication evaluation and basic computing knowledge.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Online Coding Test",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Two coding questions focused on loops, arrays, and string manipulations.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Basics of C/Java/Python, DBMS concepts, and final year project discussion.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Work adaptability, willingness to relocate, and career vision.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1364,76 +322,13 @@ const FALLBACK_COMPANIES = {
     domain: "hcltech.com",
     category: "Indian IT",
     description:
-      "Engineering services, cloud, software and digital transformation.",
+      "Engineering services, cloud, software and digital transformation preparation.",
     headquarters: "Noida, India",
-    color: "#0070C0",
     roles: [
       "Software Engineer",
       "Cloud Engineer",
       "DevOps Engineer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Logical Ability",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "General aptitude, arithmetic ability, and analytical reasoning.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical Knowledge Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Programming basics, databases, operating systems, and web technologies.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Hands-on Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Fundamental algorithmic logic, array structures, and sorting.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "TR Interview",
-        type: "INTERVIEW",
-        description:
-          "Hands-on technical validation and resume skill verification.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Interpersonal communication, conflict resolution, and professionalism.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1443,76 +338,13 @@ const FALLBACK_COMPANIES = {
     domain: "techmahindra.com",
     category: "Indian IT",
     description:
-      "Digital engineering, telecom, cloud and enterprise technology.",
+      "Digital engineering, telecom, cloud and enterprise technology preparation.",
     headquarters: "Pune, India",
-    color: "#E31837",
     roles: [
       "Software Engineer",
       "Network Engineer",
       "Cloud Engineer",
       "DevOps Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & English Assessment",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative, logical reasoning, and English language proficiency.",
-        duration: "40 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical & Telecom Concepts",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Basics of networks, cloud concepts, Linux, and database queries.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding & Pseudo-Code",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Solving logic questions and coding implementation in C/C++/Java/Python.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Practical knowledge verification, OOP concepts, and project queries.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Organizational culture fit, adaptability, and leadership potential.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1521,76 +353,14 @@ const FALLBACK_COMPANIES = {
     name: "Cognizant",
     domain: "cognizant.com",
     category: "Indian IT",
-    description: "Digital engineering, cloud, AI and enterprise technology.",
+    description:
+      "Digital engineering, cloud, AI and enterprise technology preparation.",
     headquarters: "Teaneck, New Jersey",
-    color: "#0033A0",
     roles: [
       "Programmer Analyst",
       "Software Engineer",
       "Cloud Engineer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "GenC / GenC Next Aptitude",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative, analytical reasoning, and verbal comprehension.",
-        duration: "40 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical & SQL Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "SQL queries, pseudo-code analysis, and CS core subject fundamentals.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Capability Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Algorithmic challenges catering to GenC and GenC Next tracks.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "TR Round",
-        type: "INTERVIEW",
-        description:
-          "Live coding, OOP, database design, and project architecture.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Adaptive behavioral assessment, communication, and professional conduct.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1600,74 +370,13 @@ const FALLBACK_COMPANIES = {
     domain: "ltimindtree.com",
     category: "Indian IT",
     description:
-      "Digital transformation, cloud, data and software engineering.",
+      "Digital transformation, cloud, data and software engineering preparation.",
     headquarters: "Mumbai, India",
-    color: "#1D4380",
     roles: [
       "Software Engineer",
       "Data Engineer",
       "Cloud Engineer",
       "DevOps Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Psychometric Test",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description: "Reasoning, numerical ability, and psychometric screening.",
-        duration: "40 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "CS Domain & Pseudo-code",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description: "Data structures, DBMS, OOP, and web fundamentals.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Problem solving with recursion, strings, arrays, and sorting.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Project discussion, core engineering subjects, and scenario solving.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Client orientation, adaptability, and communication skills.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1676,76 +385,14 @@ const FALLBACK_COMPANIES = {
     name: "Persistent Systems",
     domain: "persistent.com",
     category: "Indian IT",
-    description: "Digital engineering, cloud, data and software products.",
+    description:
+      "Digital engineering, cloud, data and software product preparation.",
     headquarters: "Pune, India",
-    color: "#E31837",
     roles: [
       "Software Engineer",
       "Cloud Engineer",
       "Data Engineer",
       "DevOps Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Computer Fundamentals",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative aptitude, logical reasoning, and CS fundamentals.",
-        duration: "40 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Advanced CS & OS Architecture",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Operating systems, data structures, DBMS, and network protocols.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding Assessment",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Data structures, algorithms, and complexity analysis problems.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "TR Round",
-        type: "INTERVIEW",
-        description:
-          "Deep dive into DSA, project architecture, and coding logic.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Culture, adaptability, learning mindset, and behavioral evaluation.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1755,75 +402,13 @@ const FALLBACK_COMPANIES = {
     domain: "zoho.com",
     category: "SaaS",
     description:
-      "Business software, cloud applications and product engineering.",
+      "Business software, cloud applications and product engineering preparation.",
     headquarters: "Chennai, India",
-    color: "#F44336",
     roles: [
       "Software Developer",
       "Backend Developer",
       "Frontend Developer",
       "QA Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "General Aptitude & C Flow",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description: "Math puzzles, reasoning, and C code output prediction.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "coding",
-        number: 2,
-        title: "Basic Programming Round",
-        shortTitle: "Basic Coding",
-        type: "CODING",
-        description:
-          "Pattern printing, matrix operations, and string algorithms without built-in libraries.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "technical",
-        number: 3,
-        title: "Advanced Programming / Application Design",
-        shortTitle: "App Design",
-        type: "CODING",
-        description:
-          "Designing small CLI applications (e.g., Railway Reservation, Snake game) in 2 hours.",
-        duration: "90 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Interview",
-        type: "INTERVIEW",
-        description:
-          "Code walkthrough, OOP principles, and data structure internals.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Self-learning drive, craft passion, and product mindset evaluation.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1832,76 +417,14 @@ const FALLBACK_COMPANIES = {
     name: "Freshworks",
     domain: "freshworks.com",
     category: "SaaS",
-    description: "Cloud software, customer experience and SaaS engineering.",
+    description:
+      "Cloud software, customer experience and SaaS engineering preparation.",
     headquarters: "San Mateo, California",
-    color: "#2D2D2D",
     roles: [
       "Software Engineer",
       "Frontend Developer",
       "Backend Developer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Screening Assessment",
-        shortTitle: "Screening",
-        type: "ASSESSMENT",
-        description:
-          "Analytical logic, quantitative aptitude, and core CS fundamentals.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "SaaS Architecture & Web Tech",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "REST APIs, asynchronous queues, caching, and database design.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Algorithmic Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Data structures, clean code modularity, and algorithm optimization.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "System design fundamentals, clean code walkthrough, and live coding.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Customer empathy, agility, and SaaS product engineering culture.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1911,76 +434,13 @@ const FALLBACK_COMPANIES = {
     domain: "flipkart.com",
     category: "Indian Product",
     description:
-      "E-commerce, distributed systems, logistics and product engineering.",
+      "E-commerce, distributed systems, logistics and product engineering preparation.",
     headquarters: "Bengaluru, India",
-    color: "#2874F0",
     roles: [
       "Software Development Engineer",
       "Data Engineer",
       "Backend Developer",
       "ML Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Coding Test",
-        shortTitle: "OA Coding",
-        type: "CODING",
-        description:
-          "HackerEarth test with 3 challenging algorithm and data structure problems.",
-        duration: "90 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Machine Coding Round",
-        shortTitle: "Machine Coding",
-        type: "CODING",
-        description:
-          "Low-level design (LLD): write clean, working OOP code within 2 hours.",
-        duration: "90 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Problem Solving & DSA Round",
-        shortTitle: "DSA Round",
-        type: "CODING",
-        description:
-          "Advanced data structures (Trees, Graphs, DP) and optimization.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "System Design Interview",
-        shortTitle: "HLD Round",
-        type: "INTERVIEW",
-        description:
-          "High-level architecture, caching, queues, and distributed databases.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI Hiring Manager",
-        type: "AI INTERVIEW",
-        description:
-          "Flipkart culture, customer centricity, and engineering ownership.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -1990,76 +450,13 @@ const FALLBACK_COMPANIES = {
     domain: "phonepe.com",
     category: "FinTech",
     description:
-      "Digital payments, financial technology and large-scale backend systems.",
+      "Digital payments, financial technology and large-scale backend engineering preparation.",
     headquarters: "Bengaluru, India",
-    color: "#5F259F",
     roles: [
       "Software Engineer",
       "Backend Developer",
       "Data Engineer",
       "Android Developer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Assessment",
-        shortTitle: "Online Test",
-        type: "CODING",
-        description:
-          "Complex algorithmic problem solving and optimization challenges.",
-        duration: "75 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Machine Coding / LLD Round",
-        shortTitle: "Machine Coding",
-        type: "CODING",
-        description:
-          "Build an end-to-end working system with modular OOP architecture.",
-        duration: "90 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Data Structures & Algorithms",
-        shortTitle: "DSA",
-        type: "CODING",
-        description:
-          "High-difficulty algorithmic problem solving and time complexity analysis.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "System Design & Concurrency",
-        shortTitle: "System Design",
-        type: "INTERVIEW",
-        description:
-          "Transaction processing, idempotency, distributed consistency, and scaling.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Engineering rigor, FinTech compliance mindset, and culture fit.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -2069,76 +466,13 @@ const FALLBACK_COMPANIES = {
     domain: "razorpay.com",
     category: "FinTech",
     description:
-      "Payments infrastructure, financial technology and platform engineering.",
+      "Payments infrastructure, financial technology and platform engineering preparation.",
     headquarters: "Bengaluru, India",
-    color: "#3395FF",
     roles: [
       "Software Engineer",
       "Backend Developer",
       "Frontend Developer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Assessment",
-        shortTitle: "OA",
-        type: "ASSESSMENT",
-        description:
-          "CS fundamentals, SQL queries, and algorithmic problem solving.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Machine Coding / Component Design",
-        shortTitle: "Design Coding",
-        type: "CODING",
-        description:
-          "Design and implement a clean, production-grade micro-application.",
-        duration: "90 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "DSA & Problem Solving",
-        shortTitle: "DSA Round",
-        type: "CODING",
-        description:
-          "Advanced data structures, graphs, concurrency, and dynamic programming.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "System Architecture & Resiliency",
-        shortTitle: "Tech Architecture",
-        type: "INTERVIEW",
-        description:
-          "High-availability payment gateways, message queues, and API gateways.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Ownership, transparent communication, and fast execution mindset.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -2147,76 +481,14 @@ const FALLBACK_COMPANIES = {
     name: "Swiggy",
     domain: "swiggy.com",
     category: "Indian Product",
-    description: "Consumer technology, logistics, data and large-scale systems.",
+    description:
+      "Consumer technology, logistics, data and large-scale systems preparation.",
     headquarters: "Bengaluru, India",
-    color: "#FC8019",
     roles: [
       "Software Engineer",
       "Backend Developer",
       "Data Engineer",
       "ML Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Coding Assessment",
-        shortTitle: "OA",
-        type: "CODING",
-        description:
-          "Algorithmic challenges on HackerRank with strict runtime limits.",
-        duration: "75 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Machine Coding Round",
-        shortTitle: "Machine Coding",
-        type: "CODING",
-        description:
-          "Low-level design (LLD) with complete OOP principles and test cases.",
-        duration: "90 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "DSA & Problem Solving",
-        shortTitle: "DSA Round",
-        type: "CODING",
-        description:
-          "Trees, graphs, dynamic programming, and optimization techniques.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "System Design Interview",
-        shortTitle: "System Design",
-        type: "INTERVIEW",
-        description:
-          "Hyperlocal logistics routing, real-time tracking, and high-load caching.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Consumer obsession, hustle, and engineering reliability standards.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -2225,75 +497,14 @@ const FALLBACK_COMPANIES = {
     name: "Zomato",
     domain: "zomato.com",
     category: "Indian Product",
-    description: "Consumer technology, logistics and data-driven products.",
+    description:
+      "Consumer technology, logistics and data-driven product engineering preparation.",
     headquarters: "Gurugram, India",
-    color: "#E23744",
     roles: [
       "Software Engineer",
       "Backend Developer",
       "Data Engineer",
       "ML Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Online Coding Test",
-        shortTitle: "OA",
-        type: "CODING",
-        description: "Three challenging algorithmic questions.",
-        duration: "75 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Machine Coding & Object Design",
-        shortTitle: "Machine Coding",
-        type: "CODING",
-        description:
-          "Design scalable modules with proper class hierarchies and exception handling.",
-        duration: "90 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Data Structures Round",
-        shortTitle: "DSA",
-        type: "CODING",
-        description:
-          "Complex algorithmic problem solving and live code execution.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "High-Level Architecture Interview",
-        shortTitle: "Architecture",
-        type: "INTERVIEW",
-        description:
-          "Distributed systems, geohash indexing, databases, and microservices.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI Culture",
-        type: "AI INTERVIEW",
-        description:
-          "Product obsession, velocity of execution, and cultural fit.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -2303,76 +514,13 @@ const FALLBACK_COMPANIES = {
     domain: "siemens.com",
     category: "Engineering",
     description:
-      "Industrial automation, digital engineering and intelligent infrastructure.",
+      "Industrial automation, digital engineering and intelligent infrastructure preparation.",
     headquarters: "Munich, Germany",
-    color: "#009999",
     roles: [
       "Software Engineer",
       "Embedded Engineer",
       "Automation Engineer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Core Engineering",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Logical reasoning, quantitative ability, and digital logic concepts.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Industrial & Software Systems",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Embedded C, industrial IoT protocols, C++, and OS scheduling.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Algorithm & Systems Coding",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Efficient memory management, bitwise operations, and data structure coding.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Interview",
-        type: "INTERVIEW",
-        description:
-          "Embedded architectures, software-hardware interfaces, and design patterns.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Quality standards, precision engineering mindset, and team collaboration.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -2382,76 +530,13 @@ const FALLBACK_COMPANIES = {
     domain: "bosch.com",
     category: "Engineering",
     description:
-      "Automotive, embedded systems, IoT and engineering technology.",
+      "Automotive, embedded systems, IoT and engineering technology preparation.",
     headquarters: "Gerlingen, Germany",
-    color: "#E20015",
     roles: [
       "Software Engineer",
       "Embedded Engineer",
       "Automotive Engineer",
       "Data Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Core Tech Fundamentals",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Numerical ability, logic puzzles, and core engineering fundamentals.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Embedded Systems & Automotive Protocols",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "CAN protocol, microcontrollers, RTOS concepts, and C programming.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Coding & Logic Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Pointers, bit manipulation, array handling, and data structure algorithms.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Microcontroller architecture, project details, and real-time debugging.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Safety-critical design ethics, collaboration, and career goals.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -2461,76 +546,13 @@ const FALLBACK_COMPANIES = {
     domain: "qualcomm.com",
     category: "Semiconductor",
     description:
-      "Wireless technology, embedded systems, AI and semiconductor engineering.",
+      "Wireless technology, embedded systems, AI and semiconductor engineering preparation.",
     headquarters: "San Diego, California",
-    color: "#3253DC",
     roles: [
       "Software Engineer",
       "Embedded Engineer",
       "Systems Engineer",
       "AI Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Digital Communications",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative aptitude, signals, probability, and digital logic.",
-        duration: "40 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "C / C++ & OS Internals",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Virtual memory, kernel synchronization, multi-threading, and computer networks.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Low-Level & Algorithm Coding",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Advanced C/C++ coding, memory allocators, bit tricks, and data structures.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Systems Technical Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "Embedded hardware-software interface, kernel modules, and live whiteboard coding.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Innovator mindset, communication, and engineering discipline.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -2540,233 +562,13 @@ const FALLBACK_COMPANIES = {
     domain: "amd.com",
     category: "Semiconductor",
     description:
-      "Processors, GPUs, systems and high-performance computing.",
+      "Processors, GPUs, systems and high-performance computing preparation.",
     headquarters: "Santa Clara, California",
-    color: "#ED1C24",
     roles: [
       "Software Engineer",
       "Systems Engineer",
       "AI Engineer",
       "Embedded Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Computer Architecture",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Logic reasoning, processor pipelines, cache systems, and binary math.",
-        duration: "40 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Systems, C++ & Concurrency",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Parallel programming, memory models, compilers, and driver architectures.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "High Performance Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Optimized data structure implementation in C/C++ with runtime constraints.",
-        duration: "60 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Architecture Interview",
-        shortTitle: "Tech Round",
-        type: "INTERVIEW",
-        description:
-          "GPU/CPU pipeline knowledge, firmware, and code optimization walkthrough.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "High-performance drive, resilience, and collaborative teamwork.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
-    ],
-  },
-
-  mckinsey: {
-    id: "mckinsey",
-    name: "McKinsey & Company",
-    domain: "mckinsey.com",
-    category: "Consulting",
-    description: "Technology consulting, analytics and digital transformation.",
-    headquarters: "New York, New York",
-    color: "#1F1F1F",
-    roles: [
-      "Technology Analyst",
-      "Data Engineer",
-      "Software Engineer",
-      "Data Scientist",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Solve Game-Based Assessment (PSG)",
-        shortTitle: "Solve Game",
-        type: "ASSESSMENT",
-        description:
-          "Immersive problem solving simulation evaluating critical reasoning and decision making.",
-        duration: "70 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Data Analytics & Digital Systems",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "SQL, data structures, data pipelines, and business technology architectures.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Technical Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Algorithms and structured data manipulation in Python/R/Java.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical Case Interview",
-        shortTitle: "Case Tech",
-        type: "INTERVIEW",
-        description:
-          "Structured technology problem solving, enterprise digital transformation cases.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI PEI",
-        type: "AI INTERVIEW",
-        description:
-          "Personal Experience Interview (PEI): leadership, inclusive leadership, and entrepreneurial drive.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
-    ],
-  },
-
-  pwc: {
-    id: "pwc",
-    name: "PwC",
-    domain: "pwc.com",
-    category: "Consulting",
-    description:
-      "Technology consulting, cybersecurity, analytics and enterprise systems.",
-    headquarters: "London, United Kingdom",
-    color: "#D04A02",
-    roles: [
-      "Technology Consultant",
-      "Software Engineer",
-      "Data Analyst",
-      "Cybersecurity Engineer",
-    ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "Aptitude & Numerical Reasoning",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Numerical interpretation, abstract reasoning, and situational judgment.",
-        duration: "35 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Technical Domain Assessment",
-        shortTitle: "Technical",
-        type: "ASSESSMENT",
-        description:
-          "Database queries, cybersecurity principles, and enterprise tech architecture.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Applied Coding Round",
-        shortTitle: "Coding",
-        type: "CODING",
-        description:
-          "Fundamental algorithmic logic and structured data parsing.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical & Case Study Interview",
-        shortTitle: "Case Round",
-        type: "INTERVIEW",
-        description:
-          "Technical evaluation, project architecture review, and business cases.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "PwC Professional Framework: leadership, relationship building, and business acumen.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
     ],
   },
 
@@ -2776,92 +578,95 @@ const FALLBACK_COMPANIES = {
     domain: "pitti.in",
     category: "Manufacturing",
     description:
-      "India's largest manufacturer of electrical steel laminations, motor cores, sub-assemblies, die-cast rotors, and high-precision machined components.",
+      "Engineering, manufacturing, quality, CNC and industrial technology preparation.",
     headquarters: "Hyderabad, India",
-    color: "#D04A02",
     roles: [
       "Mechanical Engineer",
       "Production Engineer",
       "CNC Machinist",
       "Quality Control Inspector",
     ],
-    rounds: [
-      {
-        id: "aptitude",
-        number: 1,
-        title: "General Aptitude & Reasoning",
-        shortTitle: "Aptitude",
-        type: "ASSESSMENT",
-        description:
-          "Quantitative aptitude, spatial reasoning, and mechanical logic.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "available",
-      },
-      {
-        id: "technical",
-        number: 2,
-        title: "Engineering Fundamentals & Metrology",
-        shortTitle: "Core Tech",
-        type: "ASSESSMENT",
-        description:
-          "Manufacturing processes, GD&T, material science, and CNC programming fundamentals.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "coding",
-        number: 3,
-        title: "Industrial & Quality Assessment",
-        shortTitle: "Industrial Test",
-        type: "ASSESSMENT",
-        description:
-          "Quality standards (ISO, Six Sigma), machining parameters, and tolerance analysis.",
-        duration: "45 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "interview",
-        number: 4,
-        title: "Technical & Domain Interview",
-        shortTitle: "Tech Interview",
-        type: "INTERVIEW",
-        description:
-          "Discussion on manufacturing techniques, equipment operation, and plant floor case studies.",
-        duration: "30 MIN",
-        levels: 2,
-        status: "locked",
-      },
-      {
-        id: "hr",
-        number: 5,
-        title: "ENGVIVA AI Interview",
-        shortTitle: "AI HR",
-        type: "AI INTERVIEW",
-        description:
-          "Workplace safety adherence, industrial ethics, and operational leadership.",
-        duration: "30 MIN",
-        levels: 30,
-        status: "locked",
-      },
-    ],
   },
 };
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function normalizeCompany(raw, companyId) {
+  if (!raw) {
+    return FALLBACK_COMPANIES[companyId] || null;
+  }
+
+  const normalized = {
+    ...raw,
+
+    id:
+      raw.id ||
+      raw.companyId ||
+      companyId,
+
+    name:
+      raw.name ||
+      raw.companyName ||
+      companyId,
+
+    domain:
+      raw.domain ||
+      raw.website ||
+      "",
+
+    category:
+      raw.category ||
+      raw.industry ||
+      "Engineering",
+
+    description:
+      raw.description ||
+      raw.summary ||
+      "Company-focused engineering preparation.",
+
+    headquarters:
+      raw.headquarters ||
+      raw.location ||
+      "Global",
+
+    roles:
+      Array.isArray(raw.roles)
+        ? raw.roles
+        : Array.isArray(raw.targetRoles)
+        ? raw.targetRoles
+        : [],
+  };
+
+  if (!normalized.roles.length) {
+    const fallback =
+      FALLBACK_COMPANIES[companyId];
+
+    normalized.roles =
+      fallback?.roles || [];
+  }
+
+  return normalized;
+}
+
 /* =========================================================
    ICONS
 ========================================================= */
 
-function ArrowIcon() {
+function ArrowIcon({
+  size = 18,
+}) {
   return (
     <svg
-      width="17"
-      height="17"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
       <path d="M5 12h14" />
       <path d="m13 6 6 6-6 6" />
@@ -2878,6 +683,8 @@ function BackIcon() {
       fill="none"
       stroke="currentColor"
       strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
       <path d="M19 12H5" />
       <path d="m11 18-6-6 6-6" />
@@ -2885,125 +692,250 @@ function BackIcon() {
   );
 }
 
+function PracticeIcon({
+  type,
+}) {
+  if (type === "aptitude") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      >
+        <rect
+          x="4"
+          y="3"
+          width="16"
+          height="18"
+          rx="2"
+        />
+        <path d="M8 7h8" />
+        <path d="M8 11h2" />
+        <path d="M12 11h2" />
+        <path d="M16 11h0" />
+        <path d="M8 15h2" />
+        <path d="M12 15h2" />
+        <path d="M16 15h0" />
+        <path d="M8 18h8" />
+      </svg>
+    );
+  }
+
+  if (type === "technical") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      >
+        <rect
+          x="3"
+          y="4"
+          width="18"
+          height="14"
+          rx="2"
+        />
+        <path d="M8 21h8" />
+        <path d="M12 18v3" />
+        <path d="m8 10 2 2-2 2" />
+        <path d="M13 14h3" />
+      </svg>
+    );
+  }
+
+  if (type === "coding") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="m8 8-4 4 4 4" />
+        <path d="m16 8 4 4-4 4" />
+        <path d="m14 5-4 14" />
+      </svg>
+    );
+  }
+
+  if (type === "interview") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      >
+        <circle
+          cx="12"
+          cy="8"
+          r="3"
+        />
+        <path d="M5 21c.7-4 3-6 7-6s6.3 2 7 6" />
+        <path d="M19 5v5" />
+        <path d="M16.5 7.5h5" />
+      </svg>
+    );
+  }
+
+  return null;
+}
+
+function StatusDot() {
+  return (
+    <span className="status-dot" />
+  );
+}
+
 /* =========================================================
-   LOGO
+   COMPANY LOGO
 ========================================================= */
 
-function CompanyLogo({ company }) {
-  const [failed, setFailed] =
-    useState(false);
+function CompanyLogo({
+  company,
+}) {
+  const [
+    failed,
+    setFailed,
+  ] = useState(false);
 
   const initials =
-    company.name
-      .split(" ")
-      .map((x) => x[0])
+    String(company.name || "EN")
+      .split(/\s+/)
+      .map(
+        (part) =>
+          part[0]
+      )
       .join("")
       .slice(0, 2)
       .toUpperCase();
 
+  const domain =
+    String(
+      company.domain || ""
+    )
+      .replace(
+        /^https?:\/\//,
+        ""
+      )
+      .replace(
+        /^www\./,
+        ""
+      )
+      .split("/")[0];
+
   return (
-    <div className="details-logo">
-      {!failed ? (
+    <div className="company-logo">
+      {!failed && domain ? (
         <img
-          src={`https://www.google.com/s2/favicons?domain=${company.domain}&sz=256`}
+          src={`https://www.google.com/s2/favicons?domain=${domain}&sz=256`}
           alt=""
           onError={() =>
             setFailed(true)
           }
         />
       ) : (
-        <span>{initials}</span>
+        <span>
+          {initials}
+        </span>
       )}
     </div>
   );
 }
 
 /* =========================================================
-   ROUND ICON
+   MODULE CARD
 ========================================================= */
 
-function RoundIcon({ type }) {
-  const icon =
-    type === "CODING"
-      ? "</>"
-      : type === "INTERVIEW"
-      ? "◉"
-      : type === "AI INTERVIEW"
-      ? "AI"
-      : "01";
-
-  return (
-    <div className="round-icon">
-      {icon}
-    </div>
-  );
-}
-
-/* =========================================================
-   ROADMAP NODE
-========================================================= */
-
-function RoadmapNode({
-  round,
-  index,
-  selected,
-  onSelect,
+function ModuleCard({
+  icon,
+  eyebrow,
+  title,
+  description,
+  stats,
+  button,
+  onClick,
+  featured = false,
 }) {
-  const isAvailable =
-    round.status ===
-      "available" ||
-    index === 0;
-
   return (
     <button
       type="button"
-      className={`roadmap-node ${
-        selected
-          ? "selected"
-          : ""
-      } ${
-        !isAvailable
-          ? "locked"
+      className={`module-card ${
+        featured
+          ? "module-card-featured"
           : ""
       }`}
-      onClick={() =>
-        onSelect(round)
-      }
+      onClick={onClick}
     >
-      <div className="roadmap-number">
-        {String(
-          round.number
-        ).padStart(2, "0")}
+      <div className="module-card-top">
+        <div className="module-icon">
+          <PracticeIcon
+            type={icon}
+          />
+        </div>
+
+        <span className="module-arrow">
+          <ArrowIcon />
+        </span>
       </div>
 
-      <div className="roadmap-node-content">
-        <span className="roadmap-type">
-          {round.type}
+      <div className="module-copy">
+        <span className="module-eyebrow">
+          {eyebrow}
         </span>
 
-        <strong>
-          {round.shortTitle ||
-            round.title}
-        </strong>
+        <h3>
+          {title}
+        </h3>
 
-        <small>
-          {round.duration}
-          {" · "}
-          {round.levels} LEVELS
-        </small>
+        <p>
+          {description}
+        </p>
       </div>
 
-      <div className="roadmap-node-state">
-        {isAvailable
-          ? "→"
-          : "LOCK"}
+      <div className="module-bottom">
+        <div className="module-stats">
+          {stats.map(
+            (
+              stat,
+              index
+            ) => (
+              <div
+                className="module-stat"
+                key={
+                  `${title}-${index}`
+                }
+              >
+                <strong>
+                  {stat.value}
+                </strong>
+
+                <span>
+                  {stat.label}
+                </span>
+              </div>
+            )
+          )}
+        </div>
+
+        <span className="module-button">
+          {button}
+          <ArrowIcon
+            size={14}
+          />
+        </span>
       </div>
     </button>
   );
 }
 
 /* =========================================================
-   MAIN
+   MAIN COMPONENT
 ========================================================= */
 
 export default function CompanyDetails() {
@@ -3018,15 +950,25 @@ export default function CompanyDetails() {
     company,
     setCompany,
   ] = useState(
-    FALLBACK_COMPANIES[
-      companyId
-    ] || null
+    () =>
+      FALLBACK_COMPANIES[
+        companyId
+      ] || null
   );
 
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] = useState(
+    !FALLBACK_COMPANIES[
+      companyId
+    ]
+  );
+
+  const [
+    backendConnected,
+    setBackendConnected,
+  ] = useState(false);
 
   const [
     selectedRole,
@@ -3034,101 +976,139 @@ export default function CompanyDetails() {
   ] = useState("");
 
   const [
-    selectedRound,
-    setSelectedRound,
-  ] = useState(null);
-
-  const [
-    backendConnected,
-    setBackendConnected,
+    roleOpen,
+    setRoleOpen,
   ] = useState(false);
 
+  const [
+    counts,
+    setCounts,
+  ] = useState({
+    aptitudeTests: 20,
+    aptitudeQuestions: null,
+    technicalQuestions: null,
+    codingEasy: null,
+    codingMedium: null,
+    codingHard: null,
+    aptitudeCompleted: 0,
+    technicalAttempted: 0,
+    codingSolved: 0,
+    interviewsCompleted: 0,
+  });
+
   /* =======================================================
-     FETCH COMPANY
+     LOAD COMPANY
+
+     Lightweight request only.
+     NO role-preparation request.
   ======================================================= */
 
-  useEffect(() => {
-    fetchCompany();
-  }, [companyId]);
+  const loadCompany =
+    useCallback(
+      async () => {
+        if (!companyId) {
+          setLoading(false);
+          return;
+        }
 
-  async function fetchCompany() {
-    try {
-      setLoading(true);
+        try {
+          const user =
+            auth.currentUser;
 
-      const user =
-        auth.currentUser;
+          const headers = {};
 
-      const headers = {};
+          if (user) {
+            try {
+              const token =
+                await user.getIdToken();
 
-      if (user) {
-        const token =
-          await user.getIdToken();
-
-        headers.Authorization =
-          `Bearer ${token}`;
-      }
-
-      const response =
-        await fetch(
-          `${API_BASE}/api/companies/${companyId}`,
-          {
-            headers,
+              headers.Authorization =
+                `Bearer ${token}`;
+            } catch {
+              // Public company data can still load.
+            }
           }
-        );
 
-      if (!response.ok) {
-        throw new Error(
-          "Company not found"
-        );
-      }
+          const response =
+            await fetch(
+              `${API_BASE}/api/companies/${encodeURIComponent(
+                companyId
+              )}`,
+              {
+                method: "GET",
+                headers,
+              }
+            );
 
-      const result =
-        await response.json();
+          if (!response.ok) {
+            throw new Error(
+              `Company request failed: ${response.status}`
+            );
+          }
 
-      const remoteCompany =
-        result.company ||
-        result.data ||
-        result;
+          const result =
+            await response.json();
 
-      if (
-        remoteCompany &&
-        remoteCompany.id
-      ) {
-        setCompany(
-          remoteCompany
-        );
+          const remote =
+            result?.company ||
+            result?.data ||
+            result;
 
-        setBackendConnected(
-          true
-        );
-      }
-    } catch (error) {
-      console.warn(
-        "[ENGVIVA] Using fallback company intelligence.",
-        error
-      );
+          const normalized =
+            normalizeCompany(
+              remote,
+              companyId
+            );
 
-      const fallback =
-        FALLBACK_COMPANIES[
-          companyId
-        ];
+          if (normalized) {
+            setCompany(
+              normalized
+            );
 
-      setCompany(
-        fallback || null
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+            setBackendConnected(
+              true
+            );
+          }
+        } catch (error) {
+          console.warn(
+            "[ENGVIVA] Company API unavailable. Using local company data.",
+            error
+          );
+
+          const fallback =
+            FALLBACK_COMPANIES[
+              companyId
+            ];
+
+          if (fallback) {
+            setCompany(
+              fallback
+            );
+          }
+        } finally {
+          setLoading(false);
+        }
+      },
+      [companyId]
+    );
+
+  useEffect(() => {
+    loadCompany();
+  }, [
+    loadCompany,
+  ]);
 
   /* =======================================================
-     ROLE
+     DEFAULT ROLE
+
+     Only local UI state.
+     Actual saved profile/target remains server-side.
   ======================================================= */
 
   useEffect(() => {
     if (
-      company?.roles?.length &&
-      !selectedRole
+      !selectedRole &&
+      company?.roles?.length
     ) {
       setSelectedRole(
         company.roles[0]
@@ -3140,43 +1120,335 @@ export default function CompanyDetails() {
   ]);
 
   /* =======================================================
-     SELECT FIRST ROUND
+     LIGHTWEIGHT PRACTICE SUMMARY
+
+     IMPORTANT:
+
+     This attempts a lightweight endpoint if your backend
+     exposes one.
+
+     If unavailable, UI remains functional and does not
+     block the company page.
+
+     Expected optional response shape:
+
+     {
+       aptitude: {
+         tests: 20,
+         questions: 400,
+         completed: 3
+       },
+       technical: {
+         questions: 250,
+         attempted: 40
+       },
+       coding: {
+         easy: 30,
+         medium: 50,
+         hard: 20,
+         solved: 12
+       },
+       interviews: {
+         completed: 4
+       }
+     }
+
+     If your existing server uses a different endpoint,
+     only this function needs to be mapped later.
   ======================================================= */
+
+  const loadPracticeSummary =
+    useCallback(
+      async () => {
+        if (!companyId) return;
+
+        try {
+          const user =
+            auth.currentUser;
+
+          if (!user) {
+            return;
+          }
+
+          const token =
+            await user.getIdToken();
+
+          const response =
+            await fetch(
+              `${API_BASE}/api/practice/summary?company=${encodeURIComponent(
+                companyId
+              )}`,
+              {
+                method: "GET",
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                },
+              }
+            );
+
+          if (!response.ok) {
+            return;
+          }
+
+          const result =
+            await response.json();
+
+          const data =
+            result?.data ||
+            result;
+
+          if (!data) return;
+
+          setCounts(
+            (previous) => ({
+              ...previous,
+
+              aptitudeTests:
+                Number(
+                  data?.aptitude
+                    ?.tests
+                ) || 20,
+
+              aptitudeQuestions:
+                data?.aptitude
+                  ?.questions ??
+                previous.aptitudeQuestions,
+
+              technicalQuestions:
+                data?.technical
+                  ?.questions ??
+                previous.technicalQuestions,
+
+              codingEasy:
+                data?.coding?.easy ??
+                previous.codingEasy,
+
+              codingMedium:
+                data?.coding?.medium ??
+                previous.codingMedium,
+
+              codingHard:
+                data?.coding?.hard ??
+                previous.codingHard,
+
+              aptitudeCompleted:
+                Number(
+                  data?.aptitude
+                    ?.completed
+                ) || 0,
+
+              technicalAttempted:
+                Number(
+                  data?.technical
+                    ?.attempted
+                ) || 0,
+
+              codingSolved:
+                Number(
+                  data?.coding
+                    ?.solved
+                ) || 0,
+
+              interviewsCompleted:
+                Number(
+                  data?.interviews
+                    ?.completed
+                ) || 0,
+            })
+          );
+        } catch (error) {
+          /*
+            Deliberately silent.
+
+            The CompanyDetails page MUST NOT become
+            dependent on a heavy practice API.
+
+            If summary is unavailable, the cards still
+            work and the actual module retrieves its own
+            database data.
+          */
+
+          console.debug(
+            "[ENGVIVA] Practice summary unavailable."
+          );
+        }
+      },
+      [companyId]
+    );
 
   useEffect(() => {
-    if (
-      company?.rounds?.length &&
-      !selectedRound
-    ) {
-      setSelectedRound(
-        company.rounds[0]
-      );
-    }
+    loadPracticeSummary();
   }, [
-    company,
-    selectedRound,
+    loadPracticeSummary,
   ]);
 
-  const roadmap =
-    useMemo(() => {
-      return (
-        company?.rounds || []
-      );
-    }, [company]);
-
   /* =======================================================
-     START PREPARATION
+     DISPLAY VALUES
   ======================================================= */
 
-  function startPreparation() {
-    if (!company) return;
+  const aptitudeStats =
+    useMemo(
+      () => [
+        {
+          value:
+            counts.aptitudeTests ??
+            20,
+          label: "TESTS",
+        },
+        {
+          value:
+            counts.aptitudeQuestions ??
+            "LIVE",
+          label:
+            counts.aptitudeQuestions !=
+            null
+              ? "QUESTIONS"
+              : "DB QUESTIONS",
+        },
+      ],
+      [counts]
+    );
 
-  navigate(
-  `/role-preparation?company=${companyId}&role=${encodeURIComponent(
-    selectedRole
-  )}`
-);
-  }
+  const technicalStats =
+    useMemo(
+      () => [
+        {
+          value:
+            counts.technicalQuestions ??
+            "LIVE",
+          label:
+            counts.technicalQuestions !=
+            null
+              ? "QUESTIONS"
+              : "FROM DATABASE",
+        },
+        {
+          value:
+            counts.technicalAttempted ||
+            0,
+          label: "ATTEMPTED",
+        },
+      ],
+      [counts]
+    );
+
+  const codingStats =
+    useMemo(
+      () => [
+        {
+          value:
+            counts.codingEasy ??
+            "—",
+          label: "EASY",
+        },
+        {
+          value:
+            counts.codingMedium ??
+            "—",
+          label: "MEDIUM",
+        },
+        {
+          value:
+            counts.codingHard ??
+            "—",
+          label: "HARD",
+        },
+      ],
+      [counts]
+    );
+
+  const interviewStats =
+    useMemo(
+      () => [
+        {
+          value:
+            counts.interviewsCompleted ||
+            0,
+          label: "COMPLETED",
+        },
+        {
+          value: "3D",
+          label: "AI SIMULATION",
+        },
+      ],
+      [counts]
+    );
+
+  /* =======================================================
+     NAVIGATION
+
+     NO /role-preparation.
+
+     Everything goes directly to the module.
+  ======================================================= */
+
+  const goToPractice =
+    useCallback(
+      (module) => {
+        if (!companyId) return;
+
+        const role =
+          encodeURIComponent(
+            selectedRole ||
+              ""
+          );
+
+        const company =
+          encodeURIComponent(
+            companyId
+          );
+
+        switch (module) {
+          case "aptitude":
+            navigate(
+              `/assessments?company=${company}&role=${role}`
+            );
+            break;
+
+          case "technical":
+            navigate(
+              `/technical-lab?company=${company}&role=${role}`
+            );
+            break;
+
+          case "coding":
+            navigate(
+              `/coding-lab?company=${company}&role=${role}`
+            );
+            break;
+
+          case "interview":
+            navigate(
+              `/interviews?company=${company}&role=${role}`
+            );
+            break;
+
+          default:
+            break;
+        }
+      },
+      [
+        companyId,
+        selectedRole,
+        navigate,
+      ]
+    );
+
+  const goToProgress =
+    useCallback(() => {
+      const company =
+        encodeURIComponent(
+          companyId || ""
+        );
+
+      navigate(
+        `/progress?company=${company}`
+      );
+    }, [
+      companyId,
+      navigate,
+    ]);
 
   /* =======================================================
      LOADING
@@ -3184,12 +1456,18 @@ export default function CompanyDetails() {
 
   if (loading) {
     return (
-      <div className="details-page loading-page">
-        <div className="loading-ring" />
+      <div className="company-details-page loading-page">
+        <div className="loading-container">
+          <div className="loading-ring" />
 
-        <span>
-          LOADING COMPANY INTELLIGENCE
-        </span>
+          <span>
+            LOADING COMPANY
+          </span>
+
+          <small>
+            ENGVIVA
+          </small>
+        </div>
 
         <style>{styles}</style>
       </div>
@@ -3202,26 +1480,40 @@ export default function CompanyDetails() {
 
   if (!company) {
     return (
-      <div className="details-page not-found">
-        <style>{styles}</style>
+      <div className="company-details-page not-found-page">
+        <div className="not-found-card">
+          <div className="not-found-number">
+            404
+          </div>
 
-        <div className="not-found-box">
-          <span>404</span>
+          <span className="not-found-label">
+            COMPANY INTELLIGENCE
+          </span>
 
           <h1>
             Company not found.
           </h1>
 
+          <p>
+            This company does not
+            exist in the current
+            ENGVIVA company index.
+          </p>
+
           <button
+            type="button"
             onClick={() =>
               navigate(
                 "/companies"
               )
             }
           >
+            <BackIcon />
             RETURN TO COMPANIES
           </button>
         </div>
+
+        <style>{styles}</style>
       </div>
     );
   }
@@ -3231,22 +1523,23 @@ export default function CompanyDetails() {
   ======================================================= */
 
   return (
-    <div className="details-page">
+    <div className="company-details-page">
       <style>{styles}</style>
 
-      <div className="details-orb orb-a" />
-      <div className="details-orb orb-b" />
-      <div className="details-grid" />
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
+      <div className="background-grid" />
 
-      <main className="details-shell">
+      <main className="company-details-shell">
 
         {/* =================================================
-            TOP NAV
+            TOP BAR
         ================================================= */}
 
-        <header className="details-topbar">
+        <header className="company-topbar">
 
           <button
+            type="button"
             className="back-button"
             onClick={() =>
               navigate(
@@ -3261,39 +1554,35 @@ export default function CompanyDetails() {
             </span>
           </button>
 
-          <div className="company-system-status">
+          <div className="live-status">
+            <StatusDot />
 
-            <span
-              className={
-                backendConnected
-                  ? "online-dot"
-                  : "local-dot"
-              }
-            />
-
-            {backendConnected
-              ? "LIVE COMPANY INTELLIGENCE"
-              : "COMPANY INTELLIGENCE"}
-
+            <span>
+              {backendConnected
+                ? "LIVE COMPANY DATA"
+                : "COMPANY PROFILE"}
+            </span>
           </div>
 
         </header>
 
         {/* =================================================
-            HERO
+            COMPANY HERO
         ================================================= */}
 
         <section className="company-hero">
 
-          <div className="hero-left">
+          <div className="hero-main">
 
-            <div className="company-identity">
+            <div className="company-heading">
 
               <CompanyLogo
-                company={company}
+                company={
+                  company
+                }
               />
 
-              <div>
+              <div className="company-title-block">
 
                 <span className="company-category">
                   {company.category}
@@ -3304,7 +1593,8 @@ export default function CompanyDetails() {
                 </h1>
 
                 <span className="company-domain">
-                  {company.domain}
+                  {company.domain ||
+                    "Engineering company"}
                 </span>
 
               </div>
@@ -3315,9 +1605,9 @@ export default function CompanyDetails() {
               {company.description}
             </p>
 
-            <div className="hero-meta">
+            <div className="company-meta">
 
-              <div>
+              <div className="meta-item">
                 <span>
                   HEADQUARTERS
                 </span>
@@ -3328,24 +1618,24 @@ export default function CompanyDetails() {
                 </strong>
               </div>
 
-              <div>
+              <div className="meta-item">
                 <span>
                   ENGINEERING ROLES
                 </span>
 
                 <strong>
-                  {company.roles?.length ||
-                    0}
+                  {company.roles
+                    ?.length || 0}
                 </strong>
               </div>
 
-              <div>
+              <div className="meta-item">
                 <span>
-                  RECRUITMENT STAGES
+                  PRACTICE MODE
                 </span>
 
                 <strong>
-                  {roadmap.length}
+                  OPEN
                 </strong>
               </div>
 
@@ -3353,38 +1643,64 @@ export default function CompanyDetails() {
 
           </div>
 
-          <div className="hero-intelligence">
+          {/* =================================================
+              QUICK PROGRESS
+          ================================================= */}
 
-            <div className="intelligence-label">
-              ENGVIVA ANALYSIS
-            </div>
+          <button
+            type="button"
+            className="progress-card"
+            onClick={
+              goToProgress
+            }
+          >
 
-            <div className="intelligence-score">
+            <div className="progress-card-top">
+
               <span>
-                READINESS
+                YOUR PROGRESS
               </span>
 
-              <strong>
-                00
-              </strong>
+              <ArrowIcon
+                size={15}
+              />
 
-              <small>
-                %
-              </small>
             </div>
 
-            <div className="score-line">
-              <span />
+            <div className="progress-visual">
+
+              <div className="progress-ring">
+
+                <span>
+                  —
+                </span>
+
+              </div>
+
+              <div>
+                <strong>
+                  {company.name}
+                </strong>
+
+                <p>
+                  Your attempts,
+                  scores and
+                  completed practice
+                  are stored in
+                  ENGVIVA.
+                </p>
+              </div>
+
             </div>
 
-            <p>
-              Select your target role
-              and complete the recruitment
-              roadmap to generate your
-              personalized readiness score.
-            </p>
+            <div className="progress-link">
+              VIEW FULL PROGRESS
+              <ArrowIcon
+                size={13}
+              />
+            </div>
 
-          </div>
+          </button>
 
         </section>
 
@@ -3394,58 +1710,109 @@ export default function CompanyDetails() {
 
         <section className="role-section">
 
-          <div className="section-heading">
+          <div className="section-label">
+            <span>
+              01
+            </span>
 
             <div>
-              <span>
-                01 / TARGET
-              </span>
+              <small>
+                TARGET ROLE
+              </small>
 
               <h2>
-                Choose your engineering role.
+                Practice for the role
+                you want.
               </h2>
             </div>
-
-            <p>
-              Your selected role controls
-              the assessments, questions,
-              coding problems and AI interview.
-            </p>
-
           </div>
 
-          <div className="role-selector">
+          <div className="role-selector-wrapper">
 
-            {(
-              company.roles ||
-              []
-            ).map(
-              (role) => (
-                <button
-                  key={role}
-                  type="button"
-                  className={
-                    selectedRole ===
-                    role
-                      ? "role-chip active"
-                      : "role-chip"
-                  }
-                  onClick={() =>
-                    setSelectedRole(
-                      role
-                    )
-                  }
-                >
-                  <span>
-                    {role}
-                  </span>
+            <button
+              type="button"
+              className="role-selector"
+              onClick={() =>
+                setRoleOpen(
+                  (value) =>
+                    !value
+                )
+              }
+            >
+              <div className="selected-role-icon">
+                {(
+                  selectedRole ||
+                  "E"
+                )
+                  .slice(0, 1)
+                  .toUpperCase()}
+              </div>
 
-                  {selectedRole ===
-                    role && (
-                    <b>✓</b>
-                  )}
-                </button>
-              )
+              <div className="selected-role-copy">
+
+                <span>
+                  SELECTED ROLE
+                </span>
+
+                <strong>
+                  {selectedRole ||
+                    "Choose a role"}
+                </strong>
+
+              </div>
+
+              <span
+                className={`chevron ${
+                  roleOpen
+                    ? "open"
+                    : ""
+                }`}
+              >
+                ↓
+              </span>
+            </button>
+
+            {roleOpen && (
+              <div className="role-dropdown">
+
+                {(
+                  company.roles ||
+                  []
+                ).map(
+                  (role) => (
+                    <button
+                      type="button"
+                      key={role}
+                      className={
+                        selectedRole ===
+                        role
+                          ? "role-option active"
+                          : "role-option"
+                      }
+                      onClick={() => {
+                        setSelectedRole(
+                          role
+                        );
+                        setRoleOpen(
+                          false
+                        );
+                      }}
+                    >
+                      <span>
+                        {role}
+                      </span>
+
+                      {selectedRole ===
+                        role && (
+                        <span className="check">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  )
+                )}
+
+              </div>
             )}
 
           </div>
@@ -3453,65 +1820,309 @@ export default function CompanyDetails() {
         </section>
 
         {/* =================================================
-            ROADMAP
+            PRACTICE
         ================================================= */}
 
-        <section className="roadmap-section">
+        <section className="practice-section">
 
-          <div className="section-heading roadmap-heading">
+          <div className="section-heading">
 
             <div>
-              <span>
-                02 / RECRUITMENT ROADMAP
+              <span className="section-number">
+                02 / PRACTICE
               </span>
 
               <h2>
-                Your path to the final interview.
+                Everything is open.
               </h2>
             </div>
 
-            <div className="roadmap-caption">
-              <span className="legend-dot" />
-              COMPLETE EACH STAGE TO UNLOCK THE NEXT
-            </div>
+            <p>
+              Choose any module,
+              any time. ENGVIVA
+              retrieves the available
+              content directly from
+              the database.
+            </p>
 
           </div>
 
-          <div className="roadmap">
+          <div className="modules-grid">
 
-            <div className="road-line">
-              <div className="road-line-progress" />
+            {/* =================================================
+                APTITUDE
+            ================================================= */}
+
+            <ModuleCard
+              icon="aptitude"
+              eyebrow="ASSESSMENT"
+              title="Aptitude"
+              description={
+                `Company-specific aptitude tests covering quantitative, logical and verbal reasoning.`
+              }
+              stats={
+                aptitudeStats
+              }
+              button="OPEN TESTS"
+              onClick={() =>
+                goToPractice(
+                  "aptitude"
+                )
+              }
+              featured
+            />
+
+            {/* =================================================
+                TECHNICAL
+            ================================================= */}
+
+            <ModuleCard
+              icon="technical"
+              eyebrow="ENGINEERING KNOWLEDGE"
+              title="Technical"
+              description={
+                `Practice company-relevant CS and engineering concepts without artificial stage locking.`
+              }
+              stats={
+                technicalStats
+              }
+              button="PRACTICE"
+              onClick={() =>
+                goToPractice(
+                  "technical"
+                )
+              }
+            />
+
+            {/* =================================================
+                CODING
+            ================================================= */}
+
+            <ModuleCard
+              icon="coding"
+              eyebrow="CODING LAB"
+              title="Coding"
+              description={
+                `Solve available company coding problems by difficulty. Choose Easy, Medium or Hard directly.`
+              }
+              stats={
+                codingStats
+              }
+              button="ENTER LAB"
+              onClick={() =>
+                goToPractice(
+                  "coding"
+                )
+              }
+              featured
+            />
+
+            {/* =================================================
+                INTERVIEW
+            ================================================= */}
+
+            <ModuleCard
+              icon="interview"
+              eyebrow="AI SIMULATION"
+              title="Interviews"
+              description={
+                `Enter technical, HR, behavioral and advanced 3D AI interview simulations.`
+              }
+              stats={
+                interviewStats
+              }
+              button="START SIMULATION"
+              onClick={() =>
+                goToPractice(
+                  "interview"
+                )
+              }
+            />
+
+          </div>
+
+        </section>
+
+        {/* =================================================
+            CODING DIFFICULTY STRIP
+        ================================================= */}
+
+        <section className="coding-strip">
+
+          <div className="coding-strip-copy">
+
+            <span>
+              CODING LAB
+            </span>
+
+            <h2>
+              Pick your difficulty.
+            </h2>
+
+            <p>
+              There is no forced sequence.
+              Start wherever your current
+              skill level demands.
+            </p>
+
+          </div>
+
+          <div className="difficulty-list">
+
+            <button
+              type="button"
+              onClick={() =>
+                goToPractice(
+                  "coding"
+                )
+              }
+            >
+              <span className="difficulty-dot easy" />
+
+              <div>
+                <strong>
+                  EASY
+                </strong>
+
+                <small>
+                  {counts.codingEasy ??
+                    "DB"}{" "}
+                  AVAILABLE
+                </small>
+              </div>
+
+              <ArrowIcon
+                size={15}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                goToPractice(
+                  "coding"
+                )
+              }
+            >
+              <span className="difficulty-dot medium" />
+
+              <div>
+                <strong>
+                  MEDIUM
+                </strong>
+
+                <small>
+                  {counts.codingMedium ??
+                    "DB"}{" "}
+                  AVAILABLE
+                </small>
+              </div>
+
+              <ArrowIcon
+                size={15}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                goToPractice(
+                  "coding"
+                )
+              }
+            >
+              <span className="difficulty-dot hard" />
+
+              <div>
+                <strong>
+                  HARD
+                </strong>
+
+                <small>
+                  {counts.codingHard ??
+                    "DB"}{" "}
+                  AVAILABLE
+                </small>
+              </div>
+
+              <ArrowIcon
+                size={15}
+              />
+            </button>
+
+          </div>
+
+        </section>
+
+        {/* =================================================
+            INTERVIEW FEATURE
+        ================================================= */}
+
+        <section className="interview-feature">
+
+          <div className="interview-feature-glow" />
+
+          <div className="interview-feature-left">
+
+            <div className="interview-badge">
+              <span />
+              ENGVIVA AI INTERVIEW
             </div>
 
-            <div className="roadmap-list">
+            <h2>
+              Don't just prepare.
+              <br />
+              <em>Enter the interview.</em>
+            </h2>
 
-              {roadmap.map(
-                (
-                  round,
-                  index
-                ) => (
-                  <RoadmapNode
-                    key={
-                      round.id ||
-                      index
-                    }
-                    round={
-                      round
-                    }
-                    index={
-                      index
-                    }
-                    selected={
-                      selectedRound?.id ===
-                      round.id
-                    }
-                    onSelect={
-                      setSelectedRound
-                    }
-                  />
+            <p>
+              Practice technical,
+              behavioral and HR
+              interviews through the
+              ENGVIVA simulation
+              environment. The advanced
+              3D interviewer experience
+              remains separate from
+              ordinary practice.
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                goToPractice(
+                  "interview"
                 )
-              )}
+              }
+            >
+              ENTER INTERVIEW
+              <ArrowIcon />
+            </button>
 
+          </div>
+
+          <div className="interview-visual">
+
+            <div className="visual-orbit orbit-one" />
+            <div className="visual-orbit orbit-two" />
+
+            <div className="avatar-placeholder">
+
+              <div className="avatar-head">
+                AI
+              </div>
+
+              <div className="avatar-body">
+                INTERVIEW
+              </div>
+
+            </div>
+
+            <div className="visual-label label-top">
+              3D
+            </div>
+
+            <div className="visual-label label-bottom">
+              LIVE
             </div>
 
           </div>
@@ -3519,132 +2130,67 @@ export default function CompanyDetails() {
         </section>
 
         {/* =================================================
-            ROUND DETAIL
+            INFORMATION
         ================================================= */}
 
-        {selectedRound && (
-          <section className="round-detail">
+        <section className="info-grid">
 
-            <div className="round-detail-icon">
-              <RoundIcon
-                type={
-                  selectedRound.type
-                }
-              />
-            </div>
+          <div className="info-card">
 
-            <div className="round-detail-copy">
-
-              <span>
-                ROUND{" "}
-                {String(
-                  selectedRound.number
-                ).padStart(
-                  2,
-                  "0"
-                )}{" "}
-                /{" "}
-                {
-                  selectedRound.type
-                }
-              </span>
-
-              <h3>
-                {selectedRound.title}
-              </h3>
-
-              <p>
-                {
-                  selectedRound.description
-                }
-              </p>
-
-              <div className="round-meta">
-
-                <span>
-                  ⏱{" "}
-                  {
-                    selectedRound.duration
-                  }
-                </span>
-
-                <span>
-                  ◈{" "}
-                  {
-                    selectedRound.levels
-                  }{" "}
-                  LEVELS
-                </span>
-
-                <span>
-                  ROLE:{" "}
-                  {selectedRole}
-                </span>
-
-              </div>
-
-            </div>
-
-            <button
-              className="round-action"
-              disabled={
-                selectedRound.status ===
-                "locked"
-              }
-            >
-              {selectedRound.status ===
-              "locked"
-                ? "LOCKED"
-                : "VIEW ROUND"}
-
-              <ArrowIcon />
-            </button>
-
-          </section>
-        )}
-
-        {/* =================================================
-            PREPARATION CTA
-        ================================================= */}
-
-        <section className="preparation-cta">
-
-          <div className="cta-glow" />
-
-          <div className="cta-copy">
-
-            <span>
-              READY TO ENTER THE SIMULATION?
+            <span className="info-number">
+              01
             </span>
 
-            <h2>
-              Prepare for{" "}
-              <em>
-                {selectedRole}
-              </em>
-              .
-            </h2>
+            <h3>
+              Database-driven
+            </h3>
 
             <p>
-              ENGVIVA will build your
-              preparation path around this
-              company and role.
+              Question counts,
+              coding problems,
+              attempts and progress
+              come from your existing
+              backend data.
             </p>
 
           </div>
 
-          <button
-            className="start-button"
-            onClick={
-              startPreparation
-            }
-          >
-            <span>
-              START PREPARATION
+          <div className="info-card">
+
+            <span className="info-number">
+              02
             </span>
 
-            <ArrowIcon />
-          </button>
+            <h3>
+              No artificial locks
+            </h3>
+
+            <p>
+              You don't have to finish
+              one module before entering
+              another. Practice what
+              you need.
+            </p>
+
+          </div>
+
+          <div className="info-card">
+
+            <span className="info-number">
+              03
+            </span>
+
+            <h3>
+              Company focused
+            </h3>
+
+            <p>
+              Every module carries the
+              selected company and role
+              into the next screen.
+            </p>
+
+          </div>
 
         </section>
 
@@ -3652,14 +2198,14 @@ export default function CompanyDetails() {
             FOOTER
         ================================================= */}
 
-        <footer className="details-footer">
+        <footer className="company-footer">
 
           <span>
             ENGVIVA / COMPANY INTELLIGENCE
           </span>
 
           <span>
-            ROLE-AWARE · ROUND-AWARE · ADAPTIVE
+            OPEN PRACTICE · LIVE DATA · AI INTERVIEWS
           </span>
 
         </footer>
@@ -3678,30 +2224,29 @@ const styles = `
   box-sizing: border-box;
 }
 
-.details-page {
+.company-details-page {
   min-height: 100vh;
-
   position: relative;
-
   overflow-x: hidden;
-
-  color: #eee9f7;
 
   background:
     radial-gradient(
-      circle at 72% 10%,
-      rgba(143,105,239,.12),
+      circle at 80% 0%,
+      rgba(143, 105, 239, .14),
       transparent 28%
     ),
     radial-gradient(
-      circle at 8% 65%,
-      rgba(93,55,173,.07),
+      circle at 0% 55%,
+      rgba(79, 47, 145, .08),
       transparent 28%
     ),
-    #07070c;
+    #07070b;
+
+  color: #eeeaf5;
 
   font-family:
     Inter,
+    ui-sans-serif,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
@@ -3713,27 +2258,25 @@ const styles = `
    BACKGROUND
 ========================================================= */
 
-.details-grid {
+.background-grid {
   position: fixed;
   inset: 0;
-
   pointer-events: none;
 
   opacity: .025;
 
   background-image:
     linear-gradient(
-      rgba(190,170,255,.3) 1px,
+      rgba(210, 190, 255, .5) 1px,
       transparent 1px
     ),
     linear-gradient(
       90deg,
-      rgba(190,170,255,.3) 1px,
+      rgba(210, 190, 255, .5) 1px,
       transparent 1px
     );
 
-  background-size:
-    70px 70px;
+  background-size: 72px 72px;
 
   mask-image:
     linear-gradient(
@@ -3743,142 +2286,118 @@ const styles = `
     );
 }
 
-.details-orb {
+.ambient {
   position: fixed;
-
-  width: 420px;
-  height: 420px;
+  width: 440px;
+  height: 440px;
 
   border-radius: 50%;
 
-  filter: blur(130px);
-
-  opacity: .09;
+  filter: blur(140px);
 
   pointer-events: none;
 
-  animation:
-    floatDetails
-    12s
-    ease-in-out
-    infinite alternate;
+  opacity: .08;
 }
 
-.orb-a {
-  right: -180px;
-  top: 80px;
+.ambient-one {
+  right: -220px;
+  top: 70px;
 
-  background: #a27bff;
+  background: #a27cff;
 }
 
-.orb-b {
-  left: -230px;
-  bottom: -130px;
+.ambient-two {
+  left: -250px;
+  bottom: -150px;
 
-  background: #5632a7;
-
-  animation-delay: -4s;
+  background: #5631a7;
 }
 
-.details-shell {
+/* =========================================================
+   SHELL
+========================================================= */
+
+.company-details-shell {
   position: relative;
-
   z-index: 2;
 
   width:
     min(
-      1360px,
-      calc(100% - 56px)
+      1380px,
+      calc(100% - 64px)
     );
 
-  margin: auto;
+  margin: 0 auto;
 
   padding:
-    32px 0 65px;
+    30px 0 70px;
 }
 
 /* =========================================================
    TOPBAR
 ========================================================= */
 
-.details-topbar {
-  height: 45px;
-
+.company-topbar {
   display: flex;
-
   align-items: center;
+  justify-content: space-between;
 
-  justify-content:
-    space-between;
+  min-height: 42px;
 
-  margin-bottom: 35px;
+  margin-bottom: 34px;
 }
 
 .back-button {
-  display: flex;
-
+  display: inline-flex;
   align-items: center;
-
   gap: 9px;
 
   border: 0;
+  outline: 0;
 
-  color: #777080;
-
+  color: #716a7c;
   background: transparent;
 
   cursor: pointer;
 
-  font-size: 7px;
-
+  font-size: 8px;
   letter-spacing: 1.7px;
+  font-weight: 700;
 
-  transition: .25s ease;
+  transition:
+    color .2s ease,
+    transform .2s ease;
 }
 
 .back-button:hover {
-  color: #c2b4da;
-
-  transform:
-    translateX(-3px);
+  color: #c4b8d7;
+  transform: translateX(-3px);
 }
 
-.company-system-status {
+.live-status {
   display: flex;
-
   align-items: center;
+  gap: 8px;
 
-  gap: 7px;
+  color: #5a5464;
 
-  color: #56505f;
-
-  font-size: 6px;
-
+  font-size: 7px;
   letter-spacing: 1.3px;
+  font-weight: 700;
 }
 
-.online-dot,
-.local-dot {
-  width: 5px;
-  height: 5px;
+.status-dot {
+  width: 6px;
+  height: 6px;
 
   border-radius: 50%;
-}
 
-.online-dot {
-  background: #63dba5;
+  background: #6de0aa;
 
   box-shadow:
-    0 0 10px
-    rgba(99,219,165,.7);
-}
-
-.local-dot {
-  background: #d49b58;
-
-  box-shadow:
-    0 0 10px
-    rgba(212,155,88,.5);
+    0 0 12px
+    rgba(109, 224, 170, .7);
 }
 
 /* =========================================================
@@ -3889,320 +2408,590 @@ const styles = `
   display: grid;
 
   grid-template-columns:
-    minmax(0, 1.7fr)
-    minmax(310px, .7fr);
+    minmax(0, 1.65fr)
+    minmax(320px, .65fr);
 
-  gap: 25px;
+  gap: 18px;
 
-  margin-bottom: 70px;
+  margin-bottom: 66px;
 }
 
-.hero-left,
-.hero-intelligence {
-  position: relative;
-
- border:
+.hero-main,
+.progress-card {
+  border:
     1px solid
-    rgba(82,227,164,.08);
+    rgba(190, 164, 245, .09);
 
   background:
     linear-gradient(
       145deg,
-      rgba(255,255,255,.043),
+      rgba(255,255,255,.045),
       rgba(255,255,255,.014)
     );
 
+  box-shadow:
+    inset 0 1px
+    rgba(255,255,255,.035);
+
   backdrop-filter:
-    blur(28px);
+    blur(25px);
 
-  border-radius: 24px;
+  border-radius: 25px;
 }
 
-.hero-left {
-  padding:
-    35px 38px 32px;
+.hero-main {
+  padding: 38px;
 }
 
-.company-identity {
+.company-heading {
   display: flex;
-
   align-items: center;
-
   gap: 20px;
 }
 
-.details-logo {
-  width: 82px;
-  height: 82px;
-
-  display: grid;
-
-  place-items: center;
+.company-logo {
+  width: 84px;
+  height: 84px;
 
   flex: 0 0 auto;
 
+  display: grid;
+  place-items: center;
+
   border:
     1px solid
-    rgba(189,165,242,.15);
+    rgba(200, 178, 248, .13);
 
   border-radius: 21px;
 
   background:
-    rgba(255,255,255,.045);
+    rgba(255,255,255,.035);
 
   box-shadow:
-    inset 0 1px
-    rgba(255,255,255,.08),
+    0 22px 55px
+    rgba(0,0,0,.22),
 
-    0 20px 50px
-    rgba(0,0,0,.18);
+    inset 0 1px
+    rgba(255,255,255,.08);
 }
 
-.details-logo img {
-  width: 50px;
-  height: 50px;
+.company-logo img {
+  width: 52px;
+  height: 52px;
 
   object-fit: contain;
 }
 
-.details-logo span {
-  color: #d4c8ea;
+.company-logo span {
+  color: #c9b9e5;
 
-  font-size: 22px;
-
+  font-size: 23px;
   font-weight: 800;
 }
 
 .company-category {
-  color: #9c82d2;
+  display: block;
+
+  color: #9a7bd0;
 
   font-size: 7px;
-
   letter-spacing: 2px;
-
   font-weight: 800;
 }
 
-.company-identity h1 {
+.company-title-block h1 {
   margin:
-    5px 0 4px;
+    6px 0 4px;
 
-  color: #eeeaf6;
+  color: #eeeaf5;
 
   font-size:
     clamp(
-      38px,
+      42px,
       5vw,
-      67px
+      70px
     );
 
-  line-height: .95;
+  line-height: .92;
 
-  letter-spacing:
-    -3px;
+  letter-spacing: -3.5px;
+
+  font-weight: 500;
 }
 
 .company-domain {
-  color: #5f5967;
+  color: #5d5766;
 
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .company-description {
-  max-width: 720px;
+  max-width: 760px;
 
   margin:
-    32px 0 28px;
+    32px 0 30px;
 
-  color: #777080;
+  color: #787181;
 
-  font-size: 10px;
+  font-size: 11px;
 
-  line-height: 1.85;
+  line-height: 1.8;
 }
 
-.hero-meta {
+.company-meta {
   display: flex;
-
-  gap: 0;
 
   border-top:
     1px solid
-    rgba(189,165,242,.07);
+    rgba(190,164,245,.07);
 
   padding-top: 20px;
 }
 
-.hero-meta > div {
-  min-width: 150px;
+.meta-item {
+  min-width: 170px;
 
   padding-right: 30px;
-
   margin-right: 30px;
 
   border-right:
     1px solid
-    rgba(189,165,242,.07);
+    rgba(190,164,245,.07);
 }
 
-.hero-meta > div:last-child {
+.meta-item:last-child {
   border-right: 0;
 }
 
-.hero-meta span {
+.meta-item span {
   display: block;
 
-  color: #514b59;
+  color: #514c59;
 
   font-size: 6px;
 
-  letter-spacing: 1.3px;
+  letter-spacing: 1.5px;
 
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
-.hero-meta strong {
-  color: #aaa0b9;
+.meta-item strong {
+  color: #aaa1b7;
 
-  font-size: 9px;
+  font-size: 10px;
 
   font-weight: 500;
 }
 
 /* =========================================================
-   INTELLIGENCE
+   PROGRESS CARD
 ========================================================= */
 
-.hero-intelligence {
-  padding: 30px;
+.progress-card {
+  position: relative;
+
+  width: 100%;
+
+  padding: 29px;
+
+  text-align: left;
+
+  color: inherit;
+
+  cursor: pointer;
 
   overflow: hidden;
+
+  transition:
+    transform .25s ease,
+    border-color .25s ease,
+    background .25s ease;
 }
 
-.hero-intelligence::after {
+.progress-card:hover {
+  transform: translateY(-4px);
+
+  border-color:
+    rgba(186,155,242,.23);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(139,103,218,.08),
+      rgba(255,255,255,.018)
+    );
+}
+
+.progress-card::before {
   content: "";
 
   position: absolute;
 
-  width: 240px;
-  height: 240px;
+  width: 230px;
+  height: 230px;
 
   right: -130px;
-  top: -120px;
+  top: -130px;
 
   border-radius: 50%;
 
   background:
     radial-gradient(
       circle,
-      rgba(164,130,255,.13),
+      rgba(160,125,238,.2),
       transparent 70%
     );
 }
 
-.intelligence-label {
-  color: #6d637b;
+.progress-card-top {
+  position: relative;
 
-  font-size: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 
-  letter-spacing: 1.8px;
+  color: #726783;
+
+  font-size: 7px;
+
+  letter-spacing: 1.7px;
+  font-weight: 800;
+}
+
+.progress-visual {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+
+  gap: 18px;
+
+  margin-top: 48px;
+}
+
+.progress-ring {
+  width: 88px;
+  height: 88px;
+
+  flex: 0 0 auto;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  border:
+    1px solid
+    rgba(183,153,238,.22);
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(150,111,230,.12),
+      transparent 68%
+    );
+
+  box-shadow:
+    0 0 45px
+    rgba(122,86,196,.12);
+}
+
+.progress-ring span {
+  color: #b59adc;
+
+  font-size: 28px;
+  font-weight: 300;
+}
+
+.progress-visual strong {
+  display: block;
+
+  color: #d3c9e1;
+
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.progress-visual p {
+  max-width: 210px;
+
+  margin:
+    7px 0 0;
+
+  color: #625b6a;
+
+  font-size: 8px;
+
+  line-height: 1.7;
+}
+
+.progress-link {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  margin-top: 36px;
+
+  color: #8f76bc;
+
+  font-size: 7px;
+
+  letter-spacing: 1.1px;
+  font-weight: 800;
+}
+
+/* =========================================================
+   SECTION LABEL
+========================================================= */
+
+.section-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 17px;
+
+  margin-bottom: 20px;
+}
+
+.section-label > span {
+  color: #9a7ed0;
+
+  font-size: 7px;
+
+  letter-spacing: 1.5px;
 
   font-weight: 800;
 }
 
-.intelligence-score {
-  display: flex;
-
-  align-items:
-    baseline;
-
-  gap: 4px;
-
-  margin-top: 55px;
-}
-
-.intelligence-score span {
-  color: #665e6d;
-
-  font-size: 7px;
-
-  letter-spacing: 1px;
-}
-
-.intelligence-score strong {
-  color: #c9b8e8;
-
-  font-size: 74px;
-
-  font-weight: 300;
-
-  letter-spacing: -5px;
-}
-
-.intelligence-score small {
-  color: #9a82c9;
-
-  font-size: 17px;
-}
-
-.score-line {
-  width: 100%;
-  height: 2px;
-
-  overflow: hidden;
-
-  margin:
-    12px 0 18px;
-
-  background:
-    rgba(185,159,239,.07);
-}
-
-.score-line span {
+.section-label small {
   display: block;
 
-  width: 0%;
+  color: #5c5664;
 
-  height: 100%;
+  font-size: 6px;
 
-  background:
-    linear-gradient(
-      90deg,
-      #8060ca,
-      #c2a9ff
-    );
+  letter-spacing: 1.7px;
+
+  font-weight: 800;
 }
 
-.hero-intelligence p {
-  color: #625b69;
+.section-label h2 {
+  margin:
+    7px 0 0;
 
-  font-size: 8px;
+  color: #dcd5e7;
 
-  line-height: 1.8;
+  font-size: 22px;
+
+  letter-spacing: -.7px;
+
+  font-weight: 500;
 }
 
 /* =========================================================
-   SECTION HEADINGS
+   ROLE
 ========================================================= */
+
+.role-section {
+  margin-bottom: 67px;
+}
+
+.role-selector-wrapper {
+  position: relative;
+
+  max-width: 580px;
+}
+
+.role-selector {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 13px;
+
+  padding: 13px;
+
+  border:
+    1px solid
+    rgba(190,164,245,.12);
+
+  border-radius: 15px;
+
+  color: inherit;
+
+  background:
+    rgba(255,255,255,.025);
+
+  cursor: pointer;
+
+  text-align: left;
+
+  transition:
+    border-color .2s ease,
+    background .2s ease;
+}
+
+.role-selector:hover {
+  border-color:
+    rgba(190,164,245,.25);
+
+  background:
+    rgba(255,255,255,.04);
+}
+
+.selected-role-icon {
+  width: 43px;
+  height: 43px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 12px;
+
+  color: #c6b2e7;
+
+  background:
+    rgba(147,109,220,.12);
+
+  border:
+    1px solid
+    rgba(178,146,239,.15);
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.selected-role-copy {
+  flex: 1;
+}
+
+.selected-role-copy span {
+  display: block;
+
+  color: #5a5461;
+
+  font-size: 6px;
+
+  letter-spacing: 1.5px;
+
+  margin-bottom: 5px;
+}
+
+.selected-role-copy strong {
+  color: #c8bfD5;
+
+  font-size: 11px;
+
+  font-weight: 500;
+}
+
+.chevron {
+  color: #766a84;
+
+  transition:
+    transform .2s ease;
+}
+
+.chevron.open {
+  transform:
+    rotate(180deg);
+}
+
+.role-dropdown {
+  position: absolute;
+
+  z-index: 30;
+
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+
+  padding: 7px;
+
+  border:
+    1px solid
+    rgba(190,164,245,.13);
+
+  border-radius: 15px;
+
+  background:
+    rgba(14,13,20,.97);
+
+  box-shadow:
+    0 25px 70px
+    rgba(0,0,0,.45);
+
+  backdrop-filter:
+    blur(25px);
+}
+
+.role-option {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding:
+    12px 13px;
+
+  border: 0;
+
+  border-radius: 10px;
+
+  color: #82798d;
+
+  background: transparent;
+
+  cursor: pointer;
+
+  text-align: left;
+
+  font-size: 9px;
+
+  transition:
+    background .2s ease,
+    color .2s ease;
+}
+
+.role-option:hover,
+.role-option.active {
+  color: #d0c4df;
+
+  background:
+    rgba(154,115,230,.1);
+}
+
+.check {
+  color: #aa8cdd;
+}
+
+/* =========================================================
+   PRACTICE
+========================================================= */
+
+.practice-section {
+  margin-bottom: 62px;
+}
 
 .section-heading {
   display: flex;
-
+  justify-content: space-between;
   align-items: flex-end;
-
-  justify-content:
-    space-between;
 
   gap: 30px;
 
-  margin-bottom: 23px;
+  margin-bottom: 22px;
 }
 
-.section-heading > div:first-child
-span {
-  color: #9178bf;
+.section-number {
+  display: block;
 
-  font-size: 6px;
+  color: #9578c9;
+
+  font-size: 7px;
 
   letter-spacing: 1.8px;
 
@@ -4213,907 +3002,1150 @@ span {
   margin:
     8px 0 0;
 
-  color: #ddd6ea;
+  color: #ded7e8;
 
-  font-size: 23px;
+  font-size: 27px;
 
-  letter-spacing: -.7px;
+  letter-spacing: -1px;
 
   font-weight: 500;
 }
 
-.section-heading > p {
-  max-width: 380px;
+.section-heading p {
+  max-width: 420px;
 
   margin: 0;
 
-  color: #5f5967;
+  color: #625b69;
 
-  font-size: 8px;
+  font-size: 9px;
 
-  line-height: 1.7;
+  line-height: 1.75;
 
   text-align: right;
 }
 
 /* =========================================================
-   ROLE SECTION
+   MODULE GRID
 ========================================================= */
 
-.role-section {
-  margin-bottom: 75px;
-}
-
-.role-selector {
-  display: flex;
-
-  flex-wrap: wrap;
-
-  gap: 8px;
-}
-
-.role-chip {
-  position: relative;
-
-  padding:
-    12px 15px;
-
-  border:
-    1px solid
-    rgba(183,158,236,.075);
-
-  border-radius: 11px;
-
-  color: #777080;
-
-  background:
-    rgba(255,255,255,.025);
-
-  cursor: pointer;
-
-  font-size: 8px;
-
-  transition:
-    .25s ease;
-}
-
-.role-chip:hover {
-  color: #b9abd0;
-
-  border-color:
-    rgba(183,158,236,.2);
-}
-
-.role-chip.active {
-  color: #d5c8ec;
-
-  border-color:
-    rgba(179,148,241,.35);
-
-  background:
-    linear-gradient(
-      135deg,
-      rgba(150,113,231,.13),
-      rgba(150,113,231,.045)
-    );
-
-  box-shadow:
-    0 10px 35px
-    rgba(103,70,170,.09);
-}
-
-.role-chip b {
-  margin-left: 8px;
-
-  color: #a990dc;
-
-  font-size: 8px;
-}
-
-/* =========================================================
-   ROADMAP
-========================================================= */
-
-.roadmap-section {
-  margin-bottom: 35px;
-}
-
-.roadmap-heading {
-  margin-bottom: 30px;
-}
-
-.roadmap-caption {
-  display: flex;
-
-  align-items: center;
-
-  gap: 8px;
-
-  color: #4e4956;
-
-  font-size: 6px;
-
-  letter-spacing: 1px;
-}
-
-.legend-dot {
-  width: 5px;
-  height: 5px;
-
-  border-radius: 50%;
-
-  background: #9b7be1;
-
-  box-shadow:
-    0 0 10px
-    rgba(155,123,225,.7);
-}
-
-.roadmap {
-  position: relative;
-
-  padding:
-    15px 0 15px;
-}
-
-.road-line {
-  position: absolute;
-
-  top: 50%;
-
-  left: 7%;
-
-  right: 7%;
-
-  height: 1px;
-
-  background:
-    rgba(183,158,236,.07);
-
-  transform:
-    translateY(-50%);
-}
-
-.road-line-progress {
-  width: 0%;
-
-  height: 100%;
-
-  background:
-    linear-gradient(
-      90deg,
-      #7151b3,
-      #ad8ced
-    );
-
-  box-shadow:
-    0 0 15px
-    rgba(161,126,239,.5);
-
-  animation:
-    roadmapProgress
-    2.4s
-    ease-out
-    forwards;
-}
-
-.roadmap-list {
-  position: relative;
-
+.modules-grid {
   display: grid;
 
   grid-template-columns:
     repeat(
-      5,
+      2,
       minmax(0, 1fr)
     );
 
-  gap: 12px;
+  gap: 14px;
 }
 
-.roadmap-node {
+.module-card {
   position: relative;
 
-  min-height: 140px;
+  min-height: 285px;
 
-  padding:
-    17px;
+  display: flex;
+  flex-direction: column;
 
-  text-align: left;
+  padding: 24px;
 
   border:
     1px solid
-    rgba(183,158,236,.075);
+    rgba(190,164,245,.09);
 
-  border-radius: 17px;
+  border-radius: 20px;
 
   color: inherit;
 
   background:
-    rgba(255,255,255,.025);
-
-  backdrop-filter:
-    blur(18px);
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,.038),
+      rgba(255,255,255,.012)
+    );
 
   cursor: pointer;
 
+  text-align: left;
+
+  overflow: hidden;
+
   transition:
-    transform .35s
+    transform .3s
       cubic-bezier(.2,.8,.2,1),
-    border-color .3s ease,
-    background .3s ease,
+    border-color .25s ease,
+    background .25s ease,
     box-shadow .3s ease;
 }
 
-.roadmap-node:hover {
-  transform:
-    translateY(-5px);
+.module-card::after {
+  content: "";
 
-  border-color:
-    rgba(177,146,239,.2);
+  position: absolute;
+
+  width: 250px;
+  height: 250px;
+
+  right: -160px;
+  bottom: -170px;
+
+  border-radius: 50%;
 
   background:
-    rgba(161,126,239,.045);
+    radial-gradient(
+      circle,
+      rgba(143,105,239,.1),
+      transparent 70%
+    );
+
+  pointer-events: none;
 }
 
-.roadmap-node.selected {
+.module-card:hover {
+  transform:
+    translateY(-6px);
+
   border-color:
-    rgba(177,146,239,.35);
+    rgba(190,164,245,.23);
 
   background:
     linear-gradient(
       145deg,
-      rgba(154,116,231,.09),
-      rgba(255,255,255,.025)
+      rgba(143,105,239,.075),
+      rgba(255,255,255,.018)
     );
 
   box-shadow:
-    0 15px 45px
-    rgba(89,60,152,.1);
+    0 25px 65px
+    rgba(0,0,0,.2);
 }
 
-.roadmap-node.locked {
-  opacity: .55;
+.module-card-featured {
+  border-color:
+    rgba(164,132,235,.14);
 }
 
-.roadmap-number {
-  color: #8c72b9;
-
-  font-size: 7px;
-
-  letter-spacing: 1.5px;
-
-  font-weight: 800;
-}
-
-.roadmap-node-content {
-  margin-top: 24px;
-}
-
-.roadmap-type {
-  display: block;
-
-  color: #524c5b;
-
-  font-size: 5.5px;
-
-  letter-spacing: 1.2px;
-
-  margin-bottom: 7px;
-}
-
-.roadmap-node strong {
-  display: block;
-
-  color: #bdb4ca;
-
-  font-size: 11px;
-
-  line-height: 1.35;
-
-  font-weight: 500;
-}
-
-.roadmap-node small {
-  display: block;
-
-  margin-top: 8px;
-
-  color: #55505c;
-
-  font-size: 6px;
-}
-
-.roadmap-node-state {
-  position: absolute;
-
-  right: 13px;
-  top: 13px;
-
-  color: #6b6179;
-
-  font-size: 9px;
-}
-
-/* =========================================================
-   ROUND DETAIL
-========================================================= */
-
-.round-detail {
-  display: grid;
-
-  grid-template-columns:
-    auto 1fr auto;
-
+.module-card-top {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-
-  gap: 23px;
-
-  padding:
-    25px 27px;
-
-  margin-bottom: 65px;
-
-  border:
-    1px solid
-    rgba(183,158,236,.085);
-
-  border-radius: 19px;
-
-  background:
-    rgba(255,255,255,.025);
-
-  backdrop-filter:
-    blur(25px);
 }
 
-.round-detail-icon {
-  width: 56px;
-  height: 56px;
+.module-icon {
+  width: 48px;
+  height: 48px;
 
   display: grid;
-
   place-items: center;
 
   border:
     1px solid
-    rgba(183,158,236,.13);
+    rgba(188,157,240,.14);
 
-  border-radius: 15px;
+  border-radius: 14px;
 
-  color: #ad93dc;
+  color: #ad90d9;
 
   background:
-    rgba(154,116,231,.06);
-
-  font-size: 10px;
-
-  font-weight: 700;
+    rgba(145,105,225,.06);
 }
 
-.round-detail-copy > span {
-  color: #8066aa;
+.module-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.module-arrow {
+  color: #625a70;
+
+  transition:
+    color .2s ease,
+    transform .2s ease;
+}
+
+.module-card:hover
+.module-arrow {
+  color: #bba4db;
+
+  transform:
+    translateX(3px);
+}
+
+.module-copy {
+  margin-top: 30px;
+}
+
+.module-eyebrow {
+  display: block;
+
+  color: #655d70;
 
   font-size: 6px;
 
-  letter-spacing: 1.4px;
+  letter-spacing: 1.6px;
+
+  font-weight: 800;
 }
 
-.round-detail-copy h3 {
+.module-copy h3 {
   margin:
-    6px 0 5px;
+    7px 0 8px;
 
-  color: #d7d0e3;
+  color: #d8d0e3;
 
-  font-size: 17px;
+  font-size: 23px;
+
+  letter-spacing: -.6px;
 
   font-weight: 500;
 }
 
-.round-detail-copy p {
+.module-copy p {
+  max-width: 510px;
+
   margin: 0;
 
-  color: #67606f;
+  color: #686171;
 
-  font-size: 8px;
+  font-size: 9px;
+
+  line-height: 1.75;
 }
 
-.round-meta {
+.module-bottom {
+  margin-top: auto;
+
+  padding-top: 25px;
+}
+
+.module-stats {
   display: flex;
+  align-items: center;
 
-  gap: 14px;
-
-  margin-top: 10px;
+  gap: 20px;
 }
 
-.round-meta span {
-  color: #55505c;
+.module-stat {
+  display: flex;
+  flex-direction: column;
+
+  min-width: 55px;
+}
+
+.module-stat strong {
+  color: #bda8d9;
+
+  font-size: 15px;
+
+  font-weight: 400;
+}
+
+.module-stat span {
+  margin-top: 4px;
+
+  color: #514b58;
+
+  font-size: 5.5px;
+
+  letter-spacing: 1px;
+
+  font-weight: 800;
+}
+
+.module-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+
+  margin-top: 20px;
+
+  color: #9075ba;
 
   font-size: 6px;
+
+  letter-spacing: 1.2px;
+
+  font-weight: 800;
 }
 
-.round-action {
-  display: flex;
+/* =========================================================
+   CODING STRIP
+========================================================= */
+
+.coding-strip {
+  display: grid;
+
+  grid-template-columns:
+    .75fr
+    1.25fr;
+
+  gap: 40px;
 
   align-items: center;
 
-  gap: 12px;
+  padding: 28px 30px;
 
-  padding:
-    11px 14px;
+  margin-bottom: 58px;
 
   border:
     1px solid
-    rgba(177,146,239,.12);
+    rgba(190,164,245,.08);
 
-  border-radius: 9px;
-
-  color: #aa97c8;
+  border-radius: 21px;
 
   background:
-    rgba(161,126,239,.045);
+    rgba(255,255,255,.018);
+}
+
+.coding-strip-copy > span {
+  color: #8d70bd;
+
+  font-size: 6px;
+
+  letter-spacing: 1.7px;
+
+  font-weight: 800;
+}
+
+.coding-strip-copy h2 {
+  margin:
+    8px 0 6px;
+
+  color: #d8d0e3;
+
+  font-size: 22px;
+
+  font-weight: 500;
+}
+
+.coding-strip-copy p {
+  max-width: 390px;
+
+  margin: 0;
+
+  color: #625b68;
+
+  font-size: 8px;
+
+  line-height: 1.7;
+}
+
+.difficulty-list {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 8px;
+}
+
+.difficulty-list button {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  min-height: 70px;
+
+  padding: 13px;
+
+  border:
+    1px solid
+    rgba(190,164,245,.08);
+
+  border-radius: 13px;
+
+  color: inherit;
+
+  background:
+    rgba(255,255,255,.022);
 
   cursor: pointer;
 
-  font-size: 6px;
+  text-align: left;
+
+  transition:
+    border-color .2s ease,
+    transform .2s ease;
+}
+
+.difficulty-list button:hover {
+  transform:
+    translateY(-3px);
+
+  border-color:
+    rgba(190,164,245,.2);
+}
+
+.difficulty-list button > div {
+  flex: 1;
+}
+
+.difficulty-list strong {
+  display: block;
+
+  color: #bdb1ca;
+
+  font-size: 8px;
 
   letter-spacing: 1px;
 }
 
-.round-action:disabled {
-  cursor: not-allowed;
+.difficulty-list small {
+  display: block;
 
-  color: #4f4a55;
+  margin-top: 5px;
 
-  border-color:
-    rgba(183,158,236,.05);
+  color: #57515e;
 
-  background:
-    rgba(255,255,255,.015);
+  font-size: 5.5px;
+
+  letter-spacing: .8px;
+}
+
+.difficulty-list button > svg {
+  color: #665d70;
+}
+
+.difficulty-dot {
+  width: 7px;
+  height: 7px;
+
+  flex: 0 0 auto;
+
+  border-radius: 50%;
+}
+
+.difficulty-dot.easy {
+  background: #62d69c;
+
+  box-shadow:
+    0 0 10px
+    rgba(98,214,156,.5);
+}
+
+.difficulty-dot.medium {
+  background: #d4aa64;
+
+  box-shadow:
+    0 0 10px
+    rgba(212,170,100,.45);
+}
+
+.difficulty-dot.hard {
+  background: #d46e7c;
+
+  box-shadow:
+    0 0 10px
+    rgba(212,110,124,.45);
 }
 
 /* =========================================================
-   CTA
+   INTERVIEW FEATURE
 ========================================================= */
 
-.preparation-cta {
+.interview-feature {
   position: relative;
 
-  display: flex;
+  display: grid;
 
-  align-items: center;
+  grid-template-columns:
+    1.1fr
+    .9fr;
 
-  justify-content:
-    space-between;
+  min-height: 390px;
 
-  gap: 30px;
-
-  padding:
-    31px 35px;
+  margin-bottom: 60px;
 
   overflow: hidden;
 
   border:
     1px solid
-    rgba(178,148,241,.12);
+    rgba(190,164,245,.12);
 
-  border-radius: 21px;
+  border-radius: 25px;
 
   background:
+    radial-gradient(
+      circle at 80% 50%,
+      rgba(143,105,239,.12),
+      transparent 34%
+    ),
     linear-gradient(
-      110deg,
-      rgba(132,94,207,.075),
-      rgba(255,255,255,.022)
+      135deg,
+      rgba(143,105,239,.07),
+      rgba(255,255,255,.015)
     );
 }
 
-.cta-glow {
+.interview-feature-glow {
   position: absolute;
 
-  width: 280px;
-  height: 280px;
+  width: 400px;
+  height: 400px;
 
-  right: 8%;
-
-  top: -200px;
+  right: -170px;
+  top: -130px;
 
   border-radius: 50%;
 
   background:
-    #9670ed;
+    #9a70ed;
 
-  filter: blur(100px);
+  filter: blur(130px);
 
   opacity: .08;
-
-  pointer-events: none;
 }
 
-.cta-copy {
+.interview-feature-left {
   position: relative;
-  z-index: 1;
+
+  z-index: 2;
+
+  padding: 45px;
 }
 
-.cta-copy > span {
-  color: #8068a9;
+.interview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  color: #9276c2;
 
   font-size: 6px;
 
-  letter-spacing: 1.8px;
+  letter-spacing: 1.7px;
 
   font-weight: 800;
 }
 
-.cta-copy h2 {
+.interview-badge span {
+  width: 5px;
+  height: 5px;
+
+  border-radius: 50%;
+
+  background: #9d7bd6;
+
+  box-shadow:
+    0 0 10px
+    rgba(157,123,214,.7);
+}
+
+.interview-feature h2 {
   margin:
-    8px 0 7px;
+    22px 0 15px;
 
-  color: #d8d1e5;
+  color: #e0d9e9;
 
-  font-size: 25px;
+  font-size:
+    clamp(
+      30px,
+      4vw,
+      48px
+    );
+
+  line-height: 1.05;
+
+  letter-spacing: -2px;
 
   font-weight: 400;
 }
 
-.cta-copy h2 em {
-  color: #aa91dd;
+.interview-feature h2 em {
+  color: #aa8cd8;
 
   font-style: normal;
 }
 
-.cta-copy p {
-  margin: 0;
+.interview-feature p {
+  max-width: 570px;
 
-  color: #625b69;
+  color: #706878;
 
-  font-size: 8px;
+  font-size: 9px;
+
+  line-height: 1.8;
 }
 
-.start-button {
-  position: relative;
-
-  z-index: 1;
-
-  display: flex;
-
+.interview-feature-left button {
+  display: inline-flex;
   align-items: center;
+  gap: 17px;
 
-  gap: 20px;
+  margin-top: 22px;
 
   padding:
-    14px 18px 14px 21px;
+    13px 17px;
 
   border:
     1px solid
-    rgba(207,188,255,.2);
+    rgba(202,177,252,.2);
 
   border-radius: 10px;
 
-  color: #eee9f7;
+  color: #e4dcef;
 
   background:
-    linear-gradient(
-      135deg,
-      rgba(140,103,216,.7),
-      rgba(164,133,239,.45)
-    );
-
-  box-shadow:
-    0 12px 40px
-    rgba(106,72,173,.16),
-
-    inset 0 1px
-    rgba(255,255,255,.12);
+    rgba(150,112,228,.14);
 
   cursor: pointer;
 
   font-size: 7px;
 
-  letter-spacing: 1.5px;
+  letter-spacing: 1.2px;
 
-  font-weight: 700;
+  font-weight: 800;
 
   transition:
-    transform .3s ease,
-    box-shadow .3s ease,
-    border-color .3s ease;
+    transform .2s ease,
+    border-color .2s ease;
 }
 
-.start-button:hover {
+.interview-feature-left button:hover {
   transform:
     translateY(-3px);
 
   border-color:
-    rgba(215,197,255,.45);
+    rgba(202,177,252,.4);
+}
+
+.interview-visual {
+  position: relative;
+
+  min-height: 390px;
+
+  display: grid;
+
+  place-items: center;
+}
+
+.visual-orbit {
+  position: absolute;
+
+  border:
+    1px solid
+    rgba(182,151,239,.12);
+
+  border-radius: 50%;
+
+  transform:
+    rotate(-18deg);
+}
+
+.orbit-one {
+  width: 330px;
+  height: 150px;
+}
+
+.orbit-two {
+  width: 230px;
+  height: 360px;
+
+  transform:
+    rotate(30deg);
+}
+
+.avatar-placeholder {
+  position: relative;
+  z-index: 3;
+
+  width: 150px;
+  height: 200px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    rgba(202,177,252,.18);
+
+  border-radius: 70px 70px 40px 40px;
+
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      rgba(185,153,241,.18),
+      transparent 42%
+    ),
+    rgba(20,17,28,.75);
 
   box-shadow:
-    0 18px 55px
-    rgba(110,73,182,.28);
+    0 0 80px
+    rgba(135,96,214,.14);
+}
+
+.avatar-head {
+  width: 68px;
+  height: 68px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  border:
+    1px solid
+    rgba(202,177,252,.18);
+
+  color: #bca3dc;
+
+  background:
+    rgba(158,120,228,.09);
+
+  font-size: 15px;
+
+  font-weight: 700;
+}
+
+.avatar-body {
+  margin-top: 16px;
+
+  color: #645c70;
+
+  font-size: 6px;
+
+  letter-spacing: 1.3px;
+}
+
+.visual-label {
+  position: absolute;
+
+  color: #76638f;
+
+  font-size: 6px;
+
+  letter-spacing: 1.5px;
+
+  font-weight: 800;
+}
+
+.label-top {
+  top: 65px;
+  right: 90px;
+}
+
+.label-bottom {
+  bottom: 65px;
+  left: 100px;
+}
+
+/* =========================================================
+   INFO GRID
+========================================================= */
+
+.info-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 10px;
+
+  margin-bottom: 55px;
+}
+
+.info-card {
+  padding: 24px;
+
+  border:
+    1px solid
+    rgba(190,164,245,.06);
+
+  border-radius: 16px;
+
+  background:
+    rgba(255,255,255,.014);
+}
+
+.info-number {
+  color: #8267aa;
+
+  font-size: 6px;
+
+  letter-spacing: 1.5px;
+}
+
+.info-card h3 {
+  margin:
+    15px 0 8px;
+
+  color: #bdb3c9;
+
+  font-size: 12px;
+
+  font-weight: 500;
+}
+
+.info-card p {
+  margin: 0;
+
+  color: #5e5865;
+
+  font-size: 8px;
+
+  line-height: 1.75;
 }
 
 /* =========================================================
    FOOTER
 ========================================================= */
 
-.details-footer {
+.company-footer {
   display: flex;
+  justify-content: space-between;
 
-  justify-content:
-    space-between;
-
-  margin-top: 45px;
-
-  padding-top: 18px;
+  padding-top: 20px;
 
   border-top:
     1px solid
-    rgba(183,158,236,.05);
+    rgba(190,164,245,.05);
 
-  color: #3f3a46;
+  color: #403b47;
 
   font-size: 5.5px;
 
   letter-spacing: 1.4px;
+
+  font-weight: 700;
 }
 
 /* =========================================================
-   LOADING / NOT FOUND
+   LOADING
 ========================================================= */
 
-.loading-page,
-.not-found {
-  display: grid;
-
-  place-items: center;
-
+.loading-page {
   min-height: 100vh;
+
+  display: grid;
+  place-items: center;
 }
 
-.loading-page {
-  gap: 15px;
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 
-  color: #5f5968;
+  gap: 13px;
+
+  color: #6a6372;
 
   font-size: 7px;
 
-  letter-spacing: 1.5px;
+  letter-spacing: 1.6px;
+}
+
+.loading-container small {
+  color: #393540;
+
+  font-size: 5px;
+
+  letter-spacing: 2px;
 }
 
 .loading-ring {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
 
   border:
     1px solid
-    rgba(178,148,241,.12);
+    rgba(190,164,245,.1);
 
   border-top-color:
-    #a58be0;
+    #a78bdc;
 
   border-radius: 50%;
 
   animation:
-    spin .8s
-    linear infinite;
+    companySpin
+    .75s
+    linear
+    infinite;
 }
 
-.not-found-box {
+/* =========================================================
+   NOT FOUND
+========================================================= */
+
+.not-found-page {
+  min-height: 100vh;
+
+  display: grid;
+  place-items: center;
+}
+
+.not-found-card {
+  width:
+    min(
+      430px,
+      calc(100% - 40px)
+    );
+
+  padding: 40px;
+
+  border:
+    1px solid
+    rgba(190,164,245,.1);
+
+  border-radius: 22px;
+
+  background:
+    rgba(255,255,255,.025);
+
   text-align: center;
 }
 
-.not-found-box > span {
-  color: #8e72bd;
+.not-found-number {
+  color: #9a7acb;
 
-  font-size: 60px;
+  font-size: 65px;
 
   font-weight: 300;
+
+  letter-spacing: -4px;
 }
 
-.not-found-box h1 {
-  color: #c5bbd3;
+.not-found-label {
+  color: #635a70;
 
-  font-size: 20px;
+  font-size: 6px;
+
+  letter-spacing: 1.7px;
 }
 
-.not-found-box button {
+.not-found-card h1 {
+  margin:
+    13px 0 8px;
+
+  color: #d3cbdf;
+
+  font-size: 22px;
+
+  font-weight: 500;
+}
+
+.not-found-card p {
+  color: #625b68;
+
+  font-size: 8px;
+
+  line-height: 1.7;
+}
+
+.not-found-card button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-top: 17px;
+
   padding:
     11px 15px;
 
   border:
     1px solid
-    rgba(178,148,241,.15);
+    rgba(190,164,245,.12);
 
   border-radius: 9px;
 
-  color: #a995c6;
+  color: #a38bc5;
 
   background:
-    rgba(161,126,239,.05);
+    rgba(143,105,239,.05);
 
   cursor: pointer;
 
-  font-size: 7px;
+  font-size: 6px;
 
   letter-spacing: 1px;
-}
-
-/* =========================================================
-   ANIMATION
-========================================================= */
-
-@keyframes roadmapProgress {
-  from {
-    width: 0%;
-  }
-
-  to {
-    width: 15%;
-  }
-}
-
-@keyframes floatDetails {
-  from {
-    transform:
-      translate3d(
-        -15px,
-        0,
-        0
-      );
-  }
-
-  to {
-    transform:
-      translate3d(
-        20px,
-        -25px,
-        0
-      );
-  }
-}
-
-@keyframes spin {
-  to {
-    transform:
-      rotate(360deg);
-  }
 }
 
 /* =========================================================
    RESPONSIVE
 ========================================================= */
 
-@media (
-  max-width: 1050px
-) {
+@media (max-width: 1050px) {
+
   .company-hero {
-    grid-template-columns:
-      1fr;
+    grid-template-columns: 1fr;
   }
 
-  .hero-intelligence {
-    min-height: 220px;
+  .progress-card {
+    min-height: 260px;
   }
 
-  .roadmap-list {
-    grid-template-columns:
-      repeat(
-        3,
-        minmax(0, 1fr)
-      );
+  .coding-strip {
+    grid-template-columns: 1fr;
   }
 
-  .road-line {
-    display: none;
+  .interview-feature {
+    grid-template-columns: 1fr;
+  }
+
+  .interview-visual {
+    min-height: 300px;
   }
 }
 
-@media (
-  max-width: 760px
-) {
-  .details-shell {
+@media (max-width: 760px) {
+
+  .company-details-shell {
     width:
       calc(100% - 28px);
 
     padding-top: 20px;
   }
 
-  .company-hero {
-    margin-bottom: 50px;
+  .company-topbar {
+    margin-bottom: 24px;
   }
 
-  .hero-left {
+  .company-hero {
+    margin-bottom: 48px;
+  }
+
+  .hero-main {
     padding: 25px;
   }
 
-  .company-identity {
+  .company-heading {
     align-items: flex-start;
   }
 
-  .details-logo {
+  .company-logo {
     width: 65px;
     height: 65px;
   }
 
-  .company-identity h1 {
-    font-size: 42px;
+  .company-logo img {
+    width: 40px;
+    height: 40px;
   }
 
-  .hero-meta {
+  .company-title-block h1 {
+    font-size: 42px;
+    letter-spacing: -2.5px;
+  }
+
+  .company-description {
+    font-size: 10px;
+  }
+
+  .company-meta {
     flex-wrap: wrap;
 
     gap: 18px;
   }
 
-  .hero-meta > div {
-    border-right: 0;
-
-    margin-right: 0;
+  .meta-item {
+    min-width: 130px;
 
     padding-right: 0;
-  }
+    margin-right: 0;
 
-  .roadmap-list {
-    grid-template-columns:
-      1fr;
-  }
-
-  .round-detail {
-    grid-template-columns:
-      auto 1fr;
-  }
-
-  .round-action {
-    grid-column: 1 / -1;
-
-    justify-content: center;
-  }
-
-  .preparation-cta {
-    flex-direction: column;
-
-    align-items: flex-start;
-  }
-
-  .start-button {
-    width: 100%;
-
-    justify-content: center;
-  }
-
-  .details-footer {
-    flex-direction: column;
-
-    gap: 9px;
-  }
-}
-
-@media (
-  max-width: 480px
-) {
-  .company-identity {
-    flex-direction: column;
-  }
-
-  .company-identity h1 {
-    font-size: 37px;
+    border-right: 0;
   }
 
   .section-heading {
     flex-direction: column;
 
     align-items: flex-start;
-  }
 
-  .section-heading > p {
-    text-align: left;
-  }
-
-  .roadmap-heading {
     gap: 12px;
   }
 
-  .round-meta {
-    flex-wrap: wrap;
+  .section-heading p {
+    text-align: left;
+  }
+
+  .modules-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coding-strip {
+    padding: 23px;
+  }
+
+  .difficulty-list {
+    grid-template-columns: 1fr;
+  }
+
+  .interview-feature-left {
+    padding: 30px;
+  }
+
+  .interview-feature h2 {
+    font-size: 34px;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .company-footer {
+    flex-direction: column;
+
+    gap: 9px;
+  }
+}
+
+@media (max-width: 480px) {
+
+  .company-heading {
+    flex-direction: column;
+  }
+
+  .company-title-block h1 {
+    font-size: 38px;
+  }
+
+  .progress-visual {
+    margin-top: 35px;
+  }
+
+  .progress-ring {
+    width: 70px;
+    height: 70px;
+  }
+
+  .progress-visual p {
+    font-size: 7px;
+  }
+
+  .module-card {
+    min-height: 265px;
+  }
+
+  .module-stats {
+    gap: 14px;
+  }
+
+  .interview-visual {
+    min-height: 270px;
+  }
+
+  .avatar-placeholder {
+    width: 125px;
+    height: 175px;
+  }
+
+  .visual-label {
+    display: none;
+  }
+}
+
+/* =========================================================
+   ANIMATION
+========================================================= */
+
+@keyframes companySpin {
+  to {
+    transform:
+      rotate(360deg);
   }
 }
 `;
