@@ -355,44 +355,37 @@ export default function ProfileSetup() {
            * whose older profile document did not contain the
            * profileCompleted flag.
            */
-          const completed =
-            data?.profileCompleted === true ||
-            result?.profileCompleted === true;
+        /*
+ * =========================================================
+ * COMPLETION DECISION
+ * =========================================================
+ *
+ * The backend is the ONLY authority.
+ *
+ * Do NOT infer completion from fields here.
+ * A profile can contain saved information and
+ * still legitimately be incomplete.
+ */
 
-          const hasSavedProfile =
-            Boolean(
-              (
-                profile?.fullName ||
-                data?.name
-              ) &&
-              profile?.college &&
-              profile?.branch &&
-              profile?.graduationYear &&
-              (
-                engineering?.primaryRole ||
-                data?.role
-              )
-            );
+if (data?.profileCompleted === true) {
+  if (mounted) {
+    setProfileExists(true);
+    setLoading(false);
+  }
 
-          /*
-           * Existing/finished user:
-           * NEVER display ProfileSetup again.
-           */
-          if (
-            completed ||
-            hasSavedProfile
-          ) {
-            if (mounted) {
-              setProfileExists(true);
-              setLoading(false);
-            }
+  window.location.replace("/dashboard");
+  return;
+}
 
-            window.location.replace(
-              "/dashboard"
-            );
+/*
+ * Existing profile but not completed.
+ *
+ * Stay on Profile Setup and load its saved information.
+ */
 
-            return;
-          }
+if (!mounted) return;
+
+setProfileExists(true);
 
           /*
            * Profile document exists but is incomplete.
