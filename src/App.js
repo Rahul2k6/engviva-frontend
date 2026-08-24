@@ -15,6 +15,7 @@ import Roles from "./screens/Roles";
 
 import Practice from "./screens/Practice";
 import Assessments from "./screens/Assessments";
+import AssessmentTest from "./screens/AssessmentTest";
 import CodingLab from "./screens/CodingLab";
 import TechnicalLab from "./screens/TechnicalLab";
 
@@ -68,6 +69,10 @@ export default function App() {
         <Route
           path="/practice/assessments"
           element={<Assessments />}
+        />
+        <Route
+         path="/practice/assessments/test"
+        element={<AssessmentTest />}
         />
         <Route
           path="/practice/coding"
