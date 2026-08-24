@@ -35,78 +35,107 @@ function firstValue(...values) {
       value !== ""
   );
 }
-
 function normalizeQuestions(payload) {
-  const root = payload?.data ?? payload;
+  let source = [];
 
-  const source = Array.isArray(root)
-    ? root
-    : Array.isArray(root?.questions)
-    ? root.questions
-    : Array.isArray(payload?.questions)
-    ? payload.questions
-    : [];
+  if (Array.isArray(payload)) {
+    source = payload;
+  } else if (Array.isArray(payload?.questions)) {
+    source = payload.questions;
+  } else if (Array.isArray(payload?.data)) {
+    source = payload.data;
+  } else if (
+    Array.isArray(payload?.data?.questions)
+  ) {
+    source = payload.data.questions;
+  } else if (
+    Array.isArray(payload?.assessment?.questions)
+  ) {
+    source = payload.assessment.questions;
+  }
 
   return source
     .map((item, index) => {
-      const options = Array.isArray(item.options)
-        ? item.options
-        : Array.isArray(item.choices)
-        ? item.choices
-        : [];
+      /*
+       * Backend JSON currently uses:
+       *
+       * {
+       *   A: "...",
+       *   B: "...",
+       *   C: "...",
+       *   D: "..."
+       * }
+       *
+       * Convert it into the array expected by the UI.
+       */
+
+      let options = [];
+
+      if (Array.isArray(item?.options)) {
+        options = item.options;
+      } else if (
+        item?.options &&
+        typeof item.options === "object"
+      ) {
+        options = ["A", "B", "C", "D"]
+          .map((letter) => item.options[letter])
+          .filter(
+            (option) =>
+              option !== undefined &&
+              option !== null
+          );
+      } else if (Array.isArray(item?.choices)) {
+        options = item.choices;
+      } else if (
+        item?.choices &&
+        typeof item.choices === "object"
+      ) {
+        options = ["A", "B", "C", "D"]
+          .map((letter) => item.choices[letter])
+          .filter(
+            (option) =>
+              option !== undefined &&
+              option !== null
+          );
+      }
 
       return {
-        id: firstValue(
-          item.questionId,
-          item.id,
-          item._id,
-          `question-${index + 1}`
-        ),
+        id:
+          item?.id ||
+          item?.questionId ||
+          item?._id ||
+          `question-${index + 1}`,
 
-        number:
-          Number(
-            firstValue(
-              item.questionNumber,
-              index + 1
-            )
-          ) || index + 1,
-
-        question: firstValue(
-          item.question,
-          item.text,
-          item.questionText,
-          `Question ${index + 1}`
-        ),
+        question:
+          item?.question ||
+          item?.text ||
+          item?.questionText ||
+          `Question ${index + 1}`,
 
         options,
 
-        type: firstValue(
-          item.type,
-          "mcq"
-        ),
+        type:
+          item?.type ||
+          "MCQ",
 
-        category: firstValue(
-          item.category,
-          item.topic,
-          "Aptitude"
-        ),
+        category:
+          item?.category ||
+          item?.source ||
+          item?.topic ||
+          "APTITUDE",
 
-        difficulty: firstValue(
-          item.difficulty,
-          item.level,
-          "Mixed"
-        ),
+        difficulty:
+          item?.difficulty ||
+          item?.level ||
+          "MIXED",
 
         marks:
-          Number(
-            firstValue(item.marks, 1)
-          ) || 1,
+          Number(item?.marks) || 1,
       };
     })
     .filter(
-      (item) =>
-        item.question &&
-        item.options.length > 0
+      (question) =>
+        question.options.length >= 2
     );
 }
 
