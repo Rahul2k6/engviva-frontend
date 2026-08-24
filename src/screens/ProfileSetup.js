@@ -5,10 +5,13 @@
   useState,
 } from "react";
 import { auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 const API_BASE = (
   import.meta.env.VITE_API_URL ||
-  "http://localhost:5000"
+  (import.meta.env.PROD
+    ? "https://engviva-backend.onrender.com"
+    : "http://localhost:5000")
 ).replace(/\/+$/, "");
 
 const branches = [
@@ -247,276 +250,339 @@ export default function ProfileSetup() {
   useEffect(() => {
     let mounted = true;
 
-    async function initializeProfile() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const user =
-          await getAuthenticatedUser();
-
-        const token =
-          await user.getIdToken();
-
-        const response =
-          await fetch(
-            `${API_BASE}/api/profile`,
-            {
-              method: "GET",
-
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-              },
-            }
-          );
-
-        /*
-         * ---------------------------------------------------
-         * NEW USER
-         * ---------------------------------------------------
-         */
-
-        if (response.status === 404) {
+    /*
+     * Firebase auth can take a moment to restore the session
+     * after a browser refresh. Wait for Firebase instead of
+     * reading auth.currentUser immediately.
+     */
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (user) => {
+        if (!user) {
           if (!mounted) return;
 
-          setProfileExists(false);
+          setError(
+            "Your login session is missing. Please login again."
+          );
+          setLoading(false);
+          return;
+        }
 
-          setForm((previous) => ({
-            ...previous,
+        try {
+          setLoading(true);
+          setError("");
+
+          const token =
+            await user.getIdToken();
+
+          const response =
+            await fetch(
+              `${API_BASE}/api/profile`,
+              {
+                method: "GET",
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                  Accept:
+                    "application/json",
+                },
+              }
+            );
+
+          /*
+           * 404 means the user has no profile document.
+           * ONLY this case gets the new-user setup screen.
+           */
+          if (response.status === 404) {
+            if (!mounted) return;
+
+            setProfileExists(false);
+
+            setForm((previous) => ({
+              ...previous,
+              email:
+                user.email || "",
+              fullName:
+                user.displayName || "",
+            }));
+
+            return;
+          }
+
+          let result = {};
+          const contentType =
+            response.headers.get(
+              "content-type"
+            ) || "";
+
+          if (
+            contentType.includes(
+              "application/json"
+            )
+          ) {
+            result =
+              await response.json();
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              result?.error?.message ||
+                result?.error ||
+                `Unable to load profile (${response.status}).`
+            );
+          }
+
+          const data =
+            result?.data ||
+            result ||
+            {};
+
+          const profile =
+            data?.profile ||
+            result?.profile ||
+            {};
+
+          const engineering =
+            data?.engineering ||
+            result?.engineering ||
+            {};
+
+          /*
+           * Existing profile detection.
+           *
+           * profileCompleted is checked first, but we also
+           * inspect actual saved fields. This protects users
+           * whose older profile document did not contain the
+           * profileCompleted flag.
+           */
+          const completed =
+            data?.profileCompleted === true ||
+            result?.profileCompleted === true;
+
+          const hasSavedProfile =
+            Boolean(
+              (
+                profile?.fullName ||
+                data?.name
+              ) &&
+              profile?.college &&
+              profile?.branch &&
+              profile?.graduationYear &&
+              (
+                engineering?.primaryRole ||
+                data?.role
+              )
+            );
+
+          /*
+           * Existing/finished user:
+           * NEVER display ProfileSetup again.
+           */
+          if (
+            completed ||
+            hasSavedProfile
+          ) {
+            if (mounted) {
+              setProfileExists(true);
+              setLoading(false);
+            }
+
+            window.location.replace(
+              "/dashboard"
+            );
+
+            return;
+          }
+
+          /*
+           * Profile document exists but is incomplete.
+           * Load it so the user can finish it.
+           */
+          if (!mounted) return;
+
+          setProfileExists(true);
+
+          const resume =
+            data?.resume ||
+            result?.resume ||
+            {};
+
+          setForm({
+            fullName:
+              profile.fullName ||
+              data.name ||
+              user.displayName ||
+              "",
 
             email:
-              user.email || "",
+              profile.email ||
+              user.email ||
+              "",
 
-            fullName:
-              user.displayName || "",
-          }));
+            phone:
+              profile.phone || "",
 
-          return;
-        }
+            location:
+              profile.location || "",
 
-        const result =
-          await response.json();
+            college:
+              profile.college || "",
 
-        if (!response.ok) {
-          throw new Error(
-            result?.error?.message ||
-              result?.error ||
-              "Unable to load profile."
+            degree:
+              profile.degree ||
+              data.degree ||
+              "B.Tech",
+
+            branch:
+              profile.branch || "",
+
+            graduationYear:
+              profile.graduationYear ||
+              "",
+
+            currentYear:
+              profile.currentYear ||
+              "",
+
+            cgpa:
+              profile.cgpa || "",
+
+            backlogs:
+              profile.backlogs ??
+              "0",
+
+            primaryRole:
+              engineering.primaryRole ||
+              data.role ||
+              "",
+
+            secondaryRoles:
+              engineering.secondaryRoles ||
+              [],
+
+            languages:
+              engineering.languages ||
+              [],
+
+            frameworks:
+              engineering.frameworks ||
+              [],
+
+            databases:
+              engineering.databases ||
+              [],
+
+            cloud:
+              engineering.cloud ||
+              [],
+
+            tools:
+              engineering.tools ||
+              [],
+
+            experienceLevel:
+              engineering.experienceLevel ||
+              "Student",
+
+            internshipExperience:
+              engineering.internshipExperience ||
+              "",
+
+            workExperience:
+              engineering.workExperience ||
+              "",
+
+            expectedPackage:
+              engineering.expectedPackage ||
+              "",
+
+            preferredLocations:
+              engineering.preferredLocations ||
+              [],
+
+            willingToRelocate:
+              engineering.willingToRelocate ??
+              true,
+          });
+
+          setSkills(
+            Array.isArray(
+              engineering.skills
+            )
+              ? engineering.skills
+              : []
           );
-        }
 
-        const data =
-          result?.data || result || {};
+          /*
+           * Only restore OCR/text intelligence.
+           * No original resume file is downloaded or stored.
+           */
+          const existingResumeText =
+            resume.rawText ||
+            resume.text ||
+            "";
 
-        /*
-         * ---------------------------------------------------
-         * COMPLETED PROFILE
-         * ---------------------------------------------------
-         *
-         * This is the ONLY condition that redirects.
-         */
-
-        const completed =
-          data.profileCompleted === true ||
-          result.profileCompleted === true;
-
-        if (completed) {
-          window.location.replace(
-            "/dashboard"
+          setResumeText(
+            existingResumeText
           );
 
-          return;
-        }
+          setResumeParsed({
+            summary:
+              resume.parsed?.summary ||
+              "",
 
-        /*
-         * ---------------------------------------------------
-         * EXISTING BUT INCOMPLETE
-         * ---------------------------------------------------
-         */
+            skills:
+              resume.parsed?.skills ||
+              [],
 
-        if (!mounted) return;
+            education:
+              resume.parsed?.education ||
+              [],
 
-        setProfileExists(true);
+            projects:
+              resume.parsed?.projects ||
+              [],
 
-        const profile =
-          data.profile || {};
+            experience:
+              resume.parsed?.experience ||
+              [],
 
-        const engineering =
-          data.engineering || {};
+            certifications:
+              resume.parsed?.certifications ||
+              [],
+          });
 
-        const resume =
-          data.resume || {};
-
-        setForm({
-          fullName:
-            profile.fullName ||
-            data.name ||
-            user.displayName ||
-            "",
-
-          email:
-            profile.email ||
-            user.email ||
-            "",
-
-          phone:
-            profile.phone || "",
-
-          location:
-            profile.location || "",
-
-          college:
-            profile.college || "",
-
-          degree:
-            profile.degree ||
-            data.degree ||
-            "B.Tech",
-
-          branch:
-            profile.branch || "",
-
-          graduationYear:
-            profile.graduationYear ||
-            "",
-
-          currentYear:
-            profile.currentYear ||
-            "",
-
-          cgpa:
-            profile.cgpa || "",
-
-          backlogs:
-            profile.backlogs ??
-            "0",
-
-          primaryRole:
-            engineering.primaryRole ||
-            data.role ||
-            "",
-
-          secondaryRoles:
-            engineering.secondaryRoles ||
-            [],
-
-          languages:
-            engineering.languages ||
-            [],
-
-          frameworks:
-            engineering.frameworks ||
-            [],
-
-          databases:
-            engineering.databases ||
-            [],
-
-          cloud:
-            engineering.cloud ||
-            [],
-
-          tools:
-            engineering.tools ||
-            [],
-
-          experienceLevel:
-            engineering.experienceLevel ||
-            "Student",
-
-          internshipExperience:
-            engineering.internshipExperience ||
-            "",
-
-          workExperience:
-            engineering.workExperience ||
-            "",
-
-          expectedPackage:
-            engineering.expectedPackage ||
-            "",
-
-          preferredLocations:
-            engineering.preferredLocations ||
-            [],
-
-          willingToRelocate:
-            engineering.willingToRelocate ??
-            true,
-        });
-
-        setSkills(
-          engineering.skills || []
-        );
-
-        /*
-         * Existing OCR resume
-         */
-
-        setResumeText(
-          resume.rawText ||
-          resume.text ||
-          ""
-        );
-
-        setResumeParsed({
-          summary:
-            resume.parsed?.summary ||
-            "",
-
-          skills:
-            resume.parsed?.skills ||
-            [],
-
-          education:
-            resume.parsed?.education ||
-            [],
-
-          projects:
-            resume.parsed?.projects ||
-            [],
-
-          experience:
-            resume.parsed?.experience ||
-            [],
-
-          certifications:
-            resume.parsed?.certifications ||
-            [],
-        });
-
-        setResumeStatus(
-          resume.status ||
-          (
-            resume.rawText
-              ? "processed"
-              : "not_added"
-          )
-        );
-      } catch (err) {
-        console.error(
-          "[PROFILE LOAD]",
-          err
-        );
-
-        if (mounted) {
-          setError(
-            err?.message ||
-              "Unable to initialize your profile."
+          setResumeStatus(
+            resume.status ||
+            (
+              existingResumeText
+                ? "processed"
+                : "not_added"
+            )
           );
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
+        } catch (err) {
+          console.error(
+            "[PROFILE LOAD]",
+            err
+          );
+
+          if (mounted) {
+            setError(
+              err?.message ||
+                "Unable to initialize your profile."
+            );
+          }
+        } finally {
+          if (mounted) {
+            setLoading(false);
+          }
         }
       }
-    }
-
-    initializeProfile();
+    );
 
     return () => {
       mounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -1061,36 +1127,23 @@ export default function ProfileSetup() {
       }
 
       /*
-       * Backend decides whether profile
-       * is complete.
+       * Successful save: leave setup immediately.
+       * Do not depend on an older backend profileCompleted
+       * flag.
        */
-
-      const completed =
-        result?.profileCompleted === true ||
-        result?.data?.profileCompleted === true;
-
-      if (completed) {
-        setSuccess(
-          "Engineering identity initialized successfully."
-        );
-
-        /*
-         * Give the UI a moment to show
-         * the completion state.
-         */
-
-        setTimeout(() => {
-          window.location.replace(
-            "/dashboard"
-          );
-        }, 700);
-
-        return;
-      }
+      setProfileExists(true);
 
       setSuccess(
-        "Profile saved. Complete the remaining information to continue."
+        "Engineering identity initialized successfully."
       );
+
+      setTimeout(() => {
+        window.location.replace(
+          "/dashboard"
+        );
+      }, 450);
+
+      return;
     } catch (err) {
       console.error(
         "[PROFILE SAVE]",
@@ -4225,6 +4278,112 @@ i {
 
   .profile-submit {
     padding: 16px;
+  }
+}
+
+/* ===========================================================
+   READABILITY / SCALE OVERRIDES
+   =========================================================== */
+
+.profile-page { font-size: 15px; }
+.brand-mark { font-size: 13px; }
+.brand-symbol { width: 34px; height: 34px; border-radius: 9px; font-size: 15px; }
+.brand-mark i { font-size: 9px; }
+.top-status { font-size: 10px; }
+
+.profile-eyebrow,
+.section-eyebrow { font-size: 11px; letter-spacing: 2px; }
+
+.hero-copy h1 { font-size: clamp(48px, 6.5vw, 82px); }
+.hero-copy p { font-size: 15px; line-height: 1.75; }
+.hero-pills span { font-size: 10px; padding: 9px 12px; }
+
+.readiness-top span,
+.readiness-bottom { font-size: 10px; }
+.readiness-top strong { font-size: 28px; }
+
+.section-heading h2 { font-size: 25px; }
+.section-heading p { font-size: 13px; line-height: 1.65; }
+
+.profile-field label { font-size: 13px; }
+.profile-field small { font-size: 10px; }
+
+.profile-field input,
+.profile-field select,
+.profile-field textarea {
+  min-height: 48px;
+  padding: 14px 15px;
+  font-size: 14px;
+}
+
+.profile-field textarea { min-height: 130px; }
+
+.input-with-status span,
+.input-suffix span { font-size: 9px; }
+
+.skill-title { font-size: 14px; }
+.skill-title-row > div:first-child > span { font-size: 10px; }
+.skill { padding: 10px 13px; font-size: 12px; }
+.skill span { font-size: 11px; }
+.skill-count { width: 52px; height: 52px; }
+.skill-count small { font-size: 8px; }
+
+.toggle-row strong { font-size: 13px; }
+.toggle-row small { font-size: 10px; line-height: 1.5; }
+
+.ocr-badge { font-size: 9px; }
+.flow-step span { font-size: 9px; }
+.flow-step strong { font-size: 12px; }
+.flow-step small { font-size: 9px; }
+
+.upload-zone { min-height: 230px; }
+.upload-zone strong { font-size: 16px; }
+.upload-zone > span { font-size: 11px; }
+.upload-zone em { font-size: 10px; }
+
+.intelligence-header span,
+.preview-label { font-size: 9px; }
+.intelligence-header strong { font-size: 14px; }
+.intelligence-state { font-size: 9px; }
+.intelligence-grid small { font-size: 9px; }
+.intelligence-grid strong { font-size: 20px; }
+
+.resume-preview p { font-size: 11px; line-height: 1.7; }
+.resume-policy strong { font-size: 12px; }
+.resume-policy p { font-size: 10px; line-height: 1.7; }
+
+.message strong { font-size: 10px; }
+.message span { font-size: 13px; }
+
+.submit-readiness strong { font-size: 12px; }
+.submit-readiness small { font-size: 10px; }
+.profile-submit button { min-height: 52px; font-size: 11px; }
+
+.loading-label { font-size: 11px; }
+.loading-text { font-size: 13px; }
+
+@media (max-width: 850px) {
+  .hero-copy p { font-size: 14px; }
+  .profile-section { padding: 24px; }
+  .section-heading h2 { font-size: 22px; }
+}
+
+@media (max-width: 600px) {
+  .profile-shell { width: calc(100% - 20px); }
+  .hero-copy h1 {
+    font-size: clamp(40px, 14vw, 62px);
+    letter-spacing: -2.8px;
+  }
+  .profile-section {
+    padding: 20px 17px;
+    border-radius: 19px;
+  }
+  .profile-field input,
+  .profile-field select,
+  .profile-field textarea { font-size: 16px; }
+  .upload-zone strong {
+    font-size: 14px;
+    text-align: center;
   }
 }
 `;
