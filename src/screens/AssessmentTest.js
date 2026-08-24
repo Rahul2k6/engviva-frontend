@@ -11,21 +11,9 @@ const API_BASE =
   import.meta.env.VITE_API_URL ||
   "https://engviva-backend.onrender.com";
 
-const RULES = [
-  "Camera and microphone must remain enabled.",
-  "Fullscreen must remain active for the entire attempt.",
-  "Switching tabs, minimizing the browser, or leaving the page terminates the attempt.",
-  "Copy, paste, cut, context-menu and common developer-tool shortcuts are disabled.",
-  "Answers are synchronized with the active assessment attempt.",
-];
-
-function formatTime(seconds) {
-  const safe = Math.max(0, Number(seconds) || 0);
-
-  return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(
-    safe % 60
-  ).padStart(2, "0")}`;
-}
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function firstValue(...values) {
   return values.find(
@@ -35,82 +23,147 @@ function firstValue(...values) {
       value !== ""
   );
 }
+
+function formatTime(seconds) {
+  const safe = Math.max(
+    0,
+    Number(seconds) || 0
+  );
+
+  const minutes = Math.floor(
+    safe / 60
+  );
+
+  const secs = safe % 60;
+
+  return `${String(minutes).padStart(
+    2,
+    "0"
+  )}:${String(secs).padStart(2, "0")}`;
+}
+
 function normalizeQuestions(payload) {
   let source = [];
 
   if (Array.isArray(payload)) {
     source = payload;
-  } else if (Array.isArray(payload?.questions)) {
+  } else if (
+    Array.isArray(payload?.questions)
+  ) {
     source = payload.questions;
-  } else if (Array.isArray(payload?.data)) {
+  } else if (
+    Array.isArray(payload?.data)
+  ) {
     source = payload.data;
   } else if (
-    Array.isArray(payload?.data?.questions)
+    Array.isArray(
+      payload?.data?.questions
+    )
   ) {
-    source = payload.data.questions;
+    source =
+      payload.data.questions;
   } else if (
-    Array.isArray(payload?.assessment?.questions)
+    Array.isArray(
+      payload?.assessment?.questions
+    )
   ) {
-    source = payload.assessment.questions;
+    source =
+      payload.assessment.questions;
   }
 
   return source
     .map((item, index) => {
-      /*
-       * Backend JSON currently uses:
-       *
-       * {
-       *   A: "...",
-       *   B: "...",
-       *   C: "...",
-       *   D: "..."
-       * }
-       *
-       * Convert it into the array expected by the UI.
-       */
-
       let options = [];
 
-      if (Array.isArray(item?.options)) {
+      if (
+        Array.isArray(item?.options)
+      ) {
         options = item.options;
       } else if (
         item?.options &&
-        typeof item.options === "object"
+        typeof item.options ===
+          "object"
       ) {
-        options = ["A", "B", "C", "D"]
-          .map((letter) => item.options[letter])
+        options = [
+          "A",
+          "B",
+          "C",
+          "D",
+        ]
+          .map(
+            (letter) =>
+              item.options[
+                letter
+              ]
+          )
           .filter(
             (option) =>
-              option !== undefined &&
+              option !==
+                undefined &&
               option !== null
           );
-      } else if (Array.isArray(item?.choices)) {
+      } else if (
+        Array.isArray(
+          item?.choices
+        )
+      ) {
         options = item.choices;
       } else if (
         item?.choices &&
-        typeof item.choices === "object"
+        typeof item.choices ===
+          "object"
       ) {
-        options = ["A", "B", "C", "D"]
-          .map((letter) => item.choices[letter])
+        options = [
+          "A",
+          "B",
+          "C",
+          "D",
+        ]
+          .map(
+            (letter) =>
+              item.choices[
+                letter
+              ]
+          )
           .filter(
             (option) =>
-              option !== undefined &&
+              option !==
+                undefined &&
               option !== null
           );
+      } else {
+        options = [
+          item?.A,
+          item?.B,
+          item?.C,
+          item?.D,
+        ].filter(
+          (option) =>
+            option !==
+              undefined &&
+            option !== null &&
+            option !== ""
+        );
       }
 
       return {
         id:
-          item?.id ||
-          item?.questionId ||
-          item?._id ||
-          `question-${index + 1}`,
+          firstValue(
+            item?.id,
+            item?.questionId,
+            item?._id,
+            `question-${index + 1}`
+          ),
 
         question:
-          item?.question ||
-          item?.text ||
-          item?.questionText ||
-          `Question ${index + 1}`,
+          firstValue(
+            item?.question,
+            item?.text,
+            item?.questionText,
+            `Question ${
+              index + 1
+            }`
+          ),
 
         options,
 
@@ -130,18 +183,36 @@ function normalizeQuestions(payload) {
           "MIXED",
 
         marks:
-          Number(item?.marks) || 1,
+          Number(item?.marks) ||
+          1,
+
+        correctAnswer:
+          firstValue(
+            item?.correctAnswer,
+            item?.answer,
+            item?.correct,
+            item?.correctOption,
+            item?.correct_option
+          ),
       };
     })
     .filter(
       (question) =>
-        question.options.length >= 2
+        question.options.length >=
+        2
     );
 }
 
+/* =========================================================
+   MAIN COMPONENT
+========================================================= */
+
 export default function AssessmentTest() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate =
+    useNavigate();
+
+  const location =
+    useLocation();
 
   const assessment =
     location.state?.assessment ||
@@ -177,73 +248,84 @@ export default function AssessmentTest() {
       params.get("company")
     ) || "";
 
-  const [phase, setPhase] =
-    useState("loading");
+  /* =======================================================
+     STATE
+  ======================================================= */
 
-  const [questions, setQuestions] =
-    useState([]);
+  const [
+    phase,
+    setPhase,
+  ] = useState("loading");
 
-  const [testMeta, setTestMeta] =
-    useState(null);
+  const [
+    questions,
+    setQuestions,
+  ] = useState([]);
 
-  const [currentIndex, setCurrentIndex] =
-    useState(0);
+  const [
+    testMeta,
+    setTestMeta,
+  ] = useState(null);
 
-  const [answers, setAnswers] =
-    useState({});
+  const [
+    currentIndex,
+    setCurrentIndex,
+  ] = useState(0);
 
-  const [remainingSeconds, setRemainingSeconds] =
-    useState(0);
+  const [
+    answers,
+    setAnswers,
+  ] = useState({});
 
-  const [startedAt, setStartedAt] =
-    useState(null);
+  const [
+    remainingSeconds,
+    setRemainingSeconds,
+  ] = useState(0);
 
-  const [attemptId, setAttemptId] =
-    useState(null);
+  const [
+    startedAt,
+    setStartedAt,
+  ] = useState(null);
 
-  const [cameraReady, setCameraReady] =
-    useState(false);
+  const [
+    attemptId,
+    setAttemptId,
+  ] = useState(null);
 
-  const [microphoneReady, setMicrophoneReady] =
-    useState(false);
+  const [
+    error,
+    setError,
+  ] = useState("");
 
-  const [fullscreenReady, setFullscreenReady] =
-    useState(false);
+  const [
+    submitError,
+    setSubmitError,
+  ] = useState("");
 
-  const [proctorStatus, setProctorStatus] =
-    useState("CHECKING");
+  const [
+    submitting,
+    setSubmitting,
+  ] = useState(false);
 
-  const [violations, setViolations] =
-    useState([]);
+  const [
+    showSubmitModal,
+    setShowSubmitModal,
+  ] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [
+    result,
+    setResult,
+  ] = useState(null);
 
-  const [submitting, setSubmitting] =
-    useState(false);
-
-  const [showSubmitModal, setShowSubmitModal] =
-    useState(false);
-
-  const [terminationReason, setTerminationReason] =
-    useState("");
-
-  const cameraRef =
-    useRef(null);
-
-  const mediaStreamRef =
-    useRef(null);
+  const [
+    loadingResult,
+    setLoadingResult,
+  ] = useState(false);
 
   const timerRef =
     useRef(null);
 
-  const violationTimerRef =
-    useRef(null);
-
   const startedRef =
-    useRef(false);
-
-  const terminatingRef =
     useRef(false);
 
   const submittingRef =
@@ -264,14 +346,12 @@ export default function AssessmentTest() {
   const attemptIdRef =
     useRef(null);
 
-  const violationsRef =
-    useRef([]);
-
-  const handleViolationRef =
-    useRef(null);
-
   const submitAssessmentRef =
     useRef(null);
+
+  /* =======================================================
+     SYNC REFS
+  ======================================================= */
 
   useEffect(() => {
     answersRef.current =
@@ -298,40 +378,53 @@ export default function AssessmentTest() {
       attemptId;
   }, [attemptId]);
 
-  useEffect(() => {
-    violationsRef.current =
-      violations;
-  }, [violations]);
+  /* =======================================================
+     FIREBASE AUTH TOKEN
+  ======================================================= */
 
   const getFirebaseToken =
-    useCallback(async () => {
-      try {
-        const firebase =
-          await import("../firebase");
+    useCallback(
+      async () => {
+        try {
+          const firebase =
+            await import(
+              "../firebase"
+            );
 
-        const auth =
-          firebase.auth ||
-          firebase.default?.auth ||
-          null;
+          const auth =
+            firebase.auth ||
+            firebase.default?.auth ||
+            null;
 
-        if (!auth?.currentUser) {
+          if (
+            !auth?.currentUser
+          ) {
+            return null;
+          }
+
+          return await auth.currentUser.getIdToken();
+        } catch (err) {
+          console.error(
+            "[ASSESSMENT AUTH]",
+            err
+          );
+
           return null;
         }
+      },
+      []
+    );
 
-        return await auth.currentUser.getIdToken();
-      } catch (err) {
-        console.error(
-          "[ASSESSMENT AUTH]",
-          err
-        );
-
-        return null;
-      }
-    }, []);
+  /* =======================================================
+     API FETCH
+  ======================================================= */
 
   const apiFetch =
     useCallback(
-      async (path, options = {}) => {
+      async (
+        path,
+        options = {}
+      ) => {
         const token =
           await getFirebaseToken();
 
@@ -346,7 +439,8 @@ export default function AssessmentTest() {
               }
             : {}),
 
-          ...(options.headers || {}),
+          ...(options.headers ||
+            {}),
         };
 
         if (token) {
@@ -365,977 +459,289 @@ export default function AssessmentTest() {
       [getFirebaseToken]
     );
 
+  /* =======================================================
+     LOAD QUESTIONS
+  ======================================================= */
+
   const loadQuestions =
-    useCallback(async () => {
-      setPhase("loading");
-      setError("");
+    useCallback(
+      async () => {
+        setPhase("loading");
+        setError("");
+        setResult(null);
 
-      if (!assessmentId) {
-        setError(
-          "No testId was supplied. Open the assessment from the assessment list or use ?testId=..."
-        );
-
-        setPhase("error");
-
-        return;
-      }
-
-      try {
-        const response =
-          await apiFetch(
-            `/api/assessments/${encodeURIComponent(
-              assessmentId
-            )}`
+        if (!assessmentId) {
+          setError(
+            "No assessment ID was supplied."
           );
 
-        const payload =
-          await response
-            .json()
-            .catch(() => ({}));
+          setPhase("error");
 
-        if (!response.ok) {
-          throw new Error(
-            payload?.error?.message ||
-              `Unable to load assessment (${response.status}).`
-          );
+          return;
         }
 
-        const data =
-          payload?.data ||
-          payload;
+        try {
+          const response =
+            await apiFetch(
+              `/api/assessments/${encodeURIComponent(
+                assessmentId
+              )}`
+            );
 
-        const normalized =
-          normalizeQuestions(data);
+          const payload =
+            await response
+              .json()
+              .catch(() => ({}));
 
-        if (!normalized.length) {
-          throw new Error(
-            "The selected test contains no usable questions."
-          );
-        }
+          if (!response.ok) {
+            throw new Error(
+              payload?.error
+                ?.message ||
+                payload?.message ||
+                `Unable to load assessment (${response.status}).`
+            );
+          }
 
-        const duration =
-          Number(
-            firstValue(
-              data.durationMinutes,
-              assessment?.durationMinutes,
-              assessment?.duration,
-              20
-            )
-          ) || 20;
+          const data =
+            payload?.data ||
+            payload;
 
-        setTestMeta({
-          testId:
-            data.testId ||
-            assessmentId,
+          const normalized =
+            normalizeQuestions(
+              data
+            );
 
-          testNumber:
-            data.testNumber,
+          if (
+            !normalized.length
+          ) {
+            throw new Error(
+              "This assessment contains no usable questions."
+            );
+          }
 
-          label:
-            data.label,
-
-          title:
-            data.title ||
-            assessment?.title ||
-            assessment?.name ||
-            "Aptitude Assessment",
-
-          questionCount:
+          const duration =
             Number(
-              data.questionCount
-            ) ||
-            normalized.length,
+              firstValue(
+                data?.durationMinutes,
+                data?.duration,
+                assessment?.durationMinutes,
+                assessment?.duration,
+                20
+              )
+            ) || 20;
 
-          durationMinutes:
-            duration,
-        });
+          const title =
+            firstValue(
+              data?.title,
+              data?.name,
+              assessment?.title,
+              assessment?.name,
+              "Aptitude Assessment"
+            );
 
-        setQuestions(
-          normalized
-        );
+          setTestMeta({
+            testId:
+              data?.testId ||
+              assessmentId,
 
-        setRemainingSeconds(
-          duration * 60
-        );
+            testNumber:
+              data?.testNumber,
 
-        setCurrentIndex(0);
+            label:
+              data?.label,
 
-        setAnswers({});
+            title,
 
-        setPhase("ready");
-      } catch (err) {
-        console.error(
-          "[ASSESSMENT LOAD]",
-          err
-        );
+            questionCount:
+              Number(
+                data?.questionCount
+              ) ||
+              normalized.length,
 
-        setError(
-          err.message ||
-            "Unable to load the assessment."
-        );
+            durationMinutes:
+              duration,
+          });
 
-        setPhase("error");
-      }
-    }, [
-      assessmentId,
-      apiFetch,
-      assessment,
-    ]);
+          setQuestions(
+            normalized
+          );
+
+          questionsRef.current =
+            normalized;
+
+          setRemainingSeconds(
+            duration * 60
+          );
+
+          remainingRef.current =
+            duration * 60;
+
+          setCurrentIndex(0);
+
+          setAnswers({});
+
+          answersRef.current =
+            {};
+
+          setPhase("ready");
+        } catch (err) {
+          console.error(
+            "[ASSESSMENT LOAD]",
+            err
+          );
+
+          setError(
+            err.message ||
+              "Unable to load assessment."
+          );
+
+          setPhase("error");
+        }
+      },
+      [
+        apiFetch,
+        assessmentId,
+        assessment,
+      ]
+    );
 
   useEffect(() => {
     loadQuestions();
   }, [loadQuestions]);
 
-  const stopMedia =
-    useCallback(() => {
-      if (!mediaStreamRef.current) {
-        return;
-      }
+  /* =======================================================
+     START ATTEMPT
+  ======================================================= */
 
-      mediaStreamRef.current
-        .getTracks()
-        .forEach((track) => {
-          track.onended = null;
-          track.stop();
-        });
-
-      mediaStreamRef.current =
-        null;
-
-      setCameraReady(false);
-      setMicrophoneReady(false);
-    }, []);
-
-  const exitFullscreen =
-    useCallback(async () => {
-      try {
-        if (
-          document.fullscreenElement
-        ) {
-          await document.exitFullscreen();
-        }
-      } catch {
-        // Already exited.
-      }
-    }, []);
-
-  const requestMedia =
-    useCallback(async () => {
-      setError("");
-
-      try {
-        if (
-          !navigator.mediaDevices?.getUserMedia
-        ) {
-          throw new Error(
-            "Camera and microphone access is not supported by this browser."
-          );
-        }
-
-        if (
-          mediaStreamRef.current
-        ) {
-          const videoOK =
-            mediaStreamRef.current
-              .getVideoTracks()
-              .some(
-                (track) =>
-                  track.readyState ===
-                  "live"
-              );
-
-          const audioOK =
-            mediaStreamRef.current
-              .getAudioTracks()
-              .some(
-                (track) =>
-                  track.readyState ===
-                  "live"
-              );
-
-          if (
-            videoOK &&
-            audioOK
-          ) {
-            setCameraReady(true);
-            setMicrophoneReady(true);
-
-            if (
-              cameraRef.current
-            ) {
-              cameraRef.current.srcObject =
-                mediaStreamRef.current;
-
-              await cameraRef.current
-                .play()
-                .catch(() => {});
-            }
-
-            return true;
-          }
-        }
-
-        const stream =
-          await navigator.mediaDevices.getUserMedia(
-            {
-              video: {
-                facingMode: "user",
-                width: {
-                  ideal: 1280,
-                },
-                height: {
-                  ideal: 720,
-                },
-              },
-
-              audio: true,
-            }
-          );
-
-        mediaStreamRef.current =
-          stream;
-
-        const videoTracks =
-          stream.getVideoTracks();
-
-        const audioTracks =
-          stream.getAudioTracks();
-
-        const cameraOK =
-          videoTracks.length > 0;
-
-        const microphoneOK =
-          audioTracks.length > 0;
-
-        setCameraReady(
-          cameraOK
-        );
-
-        setMicrophoneReady(
-          microphoneOK
-        );
-
-        const handleTrackEnded =
-          () => {
-            if (
-              !startedRef.current
-            ) {
-              return;
-            }
-
-            const cameraLive =
-              stream
-                .getVideoTracks()
-                .some(
-                  (track) =>
-                    track.readyState ===
-                    "live"
-                );
-
-            const microphoneLive =
-              stream
-                .getAudioTracks()
-                .some(
-                  (track) =>
-                    track.readyState ===
-                    "live"
-                );
-
-            setCameraReady(
-              cameraLive
-            );
-
-            setMicrophoneReady(
-              microphoneLive
-            );
-
-            if (!cameraLive) {
-              handleViolationRef.current?.(
-                "CAMERA_DISABLED"
-              );
-            } else if (
-              !microphoneLive
-            ) {
-              handleViolationRef.current?.(
-                "MICROPHONE_DISABLED"
-              );
-            }
-          };
-
-        [
-          ...videoTracks,
-          ...audioTracks,
-        ].forEach(
-          (track) => {
-            track.onended =
-              handleTrackEnded;
-          }
-        );
-
-        if (
-          cameraRef.current
-        ) {
-          cameraRef.current.srcObject =
-            stream;
-
-          await cameraRef.current
-            .play()
-            .catch(() => {});
-        }
-
-        if (
-          !cameraOK ||
-          !microphoneOK
-        ) {
-          throw new Error(
-            "Both camera and microphone are required."
-          );
-        }
-
-        return true;
-      } catch (err) {
-        console.error(
-          "[PROCTOR MEDIA]",
-          err
-        );
-
-        setCameraReady(false);
-        setMicrophoneReady(false);
-
-        setError(
-          err.message ||
-            "Camera and microphone permission is required."
-        );
-
-        return false;
-      }
-    }, []);
-
-  const enterFullscreen =
-    useCallback(async () => {
-      try {
-        if (
-          !document.fullscreenElement
-        ) {
-          await document.documentElement.requestFullscreen();
-        }
-
-        const ok =
-          Boolean(
-            document.fullscreenElement
-          );
-
-        setFullscreenReady(ok);
-
-        if (!ok) {
-          throw new Error(
-            "Fullscreen could not be activated."
-          );
-        }
-
-        return true;
-      } catch (err) {
-        console.error(
-          "[PROCTOR FULLSCREEN]",
-          err
-        );
-
-        setFullscreenReady(
-          false
-        );
-
-        setError(
-          "Fullscreen permission is required before the assessment can start."
-        );
-
-        return false;
-      }
-    }, []);
-
-  const sendProctorEvent =
+  const startAttempt =
     useCallback(
-      async (
-        type,
-        extra = {}
-      ) => {
-        const id =
-          attemptIdRef.current;
-
-        if (!id) {
-          return;
-        }
-
+      async () => {
         try {
-          await apiFetch(
-            `/api/assessments/attempts/${encodeURIComponent(
-              id
-            )}/events`,
-            {
-              method: "POST",
-
-              body: JSON.stringify({
-                type,
-
-                timestamp:
-                  new Date().toISOString(),
-
-                ...extra,
-              }),
-            }
-          );
-        } catch (err) {
-          console.warn(
-            "[PROCTOR EVENT]",
-            err
-          );
-        }
-      },
-      [apiFetch]
-    );
-
-  const terminateAssessment =
-    useCallback(
-      async (reason) => {
-        if (
-          terminatingRef.current ||
-          submittingRef.current ||
-          !startedRef.current
-        ) {
-          return;
-        }
-
-        terminatingRef.current =
-          true;
-
-        const violation = {
-          type: reason,
-          timestamp:
-            new Date().toISOString(),
-        };
-
-        const nextViolations =
-          [
-            ...violationsRef.current,
-            violation,
-          ];
-
-        violationsRef.current =
-          nextViolations;
-
-        setViolations(
-          nextViolations
-        );
-
-        setTerminationReason(
-          reason
-        );
-
-        setProctorStatus(
-          "TERMINATED"
-        );
-
-        await sendProctorEvent(
-          "TERMINATED",
-          {
-            reason,
-            violations:
-              nextViolations,
-          }
-        );
-
-        try {
-          const duration =
-            Number(
-              testMeta?.durationMinutes
-            ) || 20;
-
           const response =
             await apiFetch(
-              "/api/assessments/submit",
+              "/api/assessments/attempts/start",
               {
                 method: "POST",
 
                 body: JSON.stringify({
                   assessmentId,
                   companyId,
-
-                  attemptId:
-                    attemptIdRef.current,
-
-                  startedAt:
-                    startedAtRef.current,
-
-                  completedAt:
-                    new Date().toISOString(),
-
-                  answers:
-                    answersRef.current,
-
-                  totalQuestions:
-                    questionsRef.current
-                      .length,
-
-                  answeredQuestions:
-                    Object.keys(
-                      answersRef.current
-                    ).length,
-
-                  unansweredQuestions:
-                    Math.max(
-                      0,
-                      questionsRef.current
-                        .length -
-                        Object.keys(
-                          answersRef.current
-                        ).length
-                    ),
-
-                  timeAllowedSeconds:
-                    duration * 60,
-
-                  timeUsedSeconds:
-                    Math.max(
-                      0,
-                      duration * 60 -
-                        remainingRef.current
-                    ),
-
-                  automaticSubmission:
-                    true,
-
-                  terminated:
-                    true,
-
-                  proctoring: {
-                    status:
-                      "TERMINATED",
-
-                    violations:
-                      nextViolations,
-
-                    camera:
-                      cameraReady,
-
-                    microphone:
-                      microphoneReady,
-
-                    fullscreen:
-                      Boolean(
-                        document.fullscreenElement
-                      ),
-                  },
                 }),
               }
             );
 
-          const result =
+          const payload =
             await response
               .json()
               .catch(() => ({}));
 
-          if (response.ok) {
-            const reportId =
-              result?.data?.attemptId ||
-              result?.attemptId ||
-              attemptIdRef.current;
-
-            stopMedia();
-
-            await exitFullscreen();
-
-            startedRef.current =
-              false;
-
-            navigate(
-              `/reports/${encodeURIComponent(
-                reportId
-              )}`,
-              {
-                replace: true,
-
-                state: {
-                  source:
-                    "assessment",
-
-                  status:
-                    "terminated",
-
-                  result,
-                },
-              }
+          if (!response.ok) {
+            throw new Error(
+              payload?.error
+                ?.message ||
+                payload?.message ||
+                "Unable to create assessment attempt."
             );
-
-            return;
           }
+
+          const id =
+            payload?.data
+              ?.attemptId ||
+            payload?.attemptId ||
+            payload?.id ||
+            null;
+
+          if (!id) {
+            throw new Error(
+              "Backend did not return an attempt ID."
+            );
+          }
+
+          setAttemptId(id);
+
+          attemptIdRef.current =
+            id;
+
+          return id;
         } catch (err) {
           console.error(
-            "[TERMINATION SUBMIT]",
+            "[ATTEMPT START]",
             err
           );
+
+          setError(
+            err.message ||
+              "Unable to start assessment."
+          );
+
+          return null;
         }
-
-        stopMedia();
-
-        await exitFullscreen();
-
-        startedRef.current =
-          false;
-
-        setPhase(
-          "terminated"
-        );
       },
       [
         apiFetch,
         assessmentId,
-        cameraReady,
         companyId,
-        exitFullscreen,
-        microphoneReady,
-        navigate,
-        sendProctorEvent,
-        stopMedia,
-        testMeta,
       ]
     );
 
-  useEffect(() => {
-    handleViolationRef.current =
-      terminateAssessment;
-  }, [terminateAssessment]);
-
-  const startAttempt =
-    useCallback(async () => {
-      try {
-        const response =
-          await apiFetch(
-            "/api/assessments/attempts/start",
-            {
-              method: "POST",
-
-              body: JSON.stringify({
-                assessmentId,
-                companyId,
-              }),
-            }
-          );
-
-        const payload =
-          await response
-            .json()
-            .catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(
-            payload?.error?.message ||
-              "Unable to create assessment attempt."
-          );
-        }
-
-        const id =
-          payload?.data?.attemptId ||
-          payload?.attemptId ||
-          payload?.id;
-
-        if (!id) {
-          throw new Error(
-            "Backend did not return an assessment attempt ID."
-          );
-        }
-
-        setAttemptId(id);
-
-        attemptIdRef.current =
-          id;
-
-        return id;
-      } catch (err) {
-        console.error(
-          "[ATTEMPT START]",
-          err
-        );
-
-        setError(
-          err.message ||
-            "Unable to start the secure assessment."
-        );
-
-        return null;
-      }
-    }, [
-      apiFetch,
-      assessmentId,
-      companyId,
-    ]);
+  /* =======================================================
+     START ASSESSMENT
+  ======================================================= */
 
   const startAssessment =
-    async () => {
-      setError("");
+    useCallback(
+      async () => {
+        setError("");
+        setSubmitError("");
 
-      const mediaOK =
-        await requestMedia();
+        const id =
+          await startAttempt();
 
-      if (!mediaOK) {
-        return;
-      }
-
-      const fullscreenOK =
-        await enterFullscreen();
-
-      if (!fullscreenOK) {
-        return;
-      }
-
-      const id =
-        await startAttempt();
-
-      if (!id) {
-        await exitFullscreen();
-
-        return;
-      }
-
-      startedRef.current =
-        true;
-
-      terminatingRef.current =
-        false;
-
-      submittingRef.current =
-        false;
-
-      const now =
-        new Date().toISOString();
-
-      const duration =
-        Number(
-          testMeta?.durationMinutes
-        ) || 20;
-
-      setStartedAt(now);
-
-      startedAtRef.current =
-        now;
-
-      setRemainingSeconds(
-        duration * 60
-      );
-
-      remainingRef.current =
-        duration * 60;
-
-      setCurrentIndex(0);
-
-      setProctorStatus(
-        "ACTIVE"
-      );
-
-      setPhase("running");
-    };
-
-  useEffect(() => {
-    if (
-      phase !== "running"
-    ) {
-      return;
-    }
-
-    const onVisibilityChange =
-      () => {
-        if (
-          document.visibilityState ===
-          "hidden"
-        ) {
-          handleViolationRef.current?.(
-            "TAB_SWITCH_OR_PAGE_HIDDEN"
-          );
+        if (!id) {
+          return;
         }
-      };
 
-    const onBlur =
-      () => {
-        clearTimeout(
-          violationTimerRef.current
+        const now =
+          new Date().toISOString();
+
+        const duration =
+          Number(
+            testMeta?.durationMinutes
+          ) || 20;
+
+        startedRef.current =
+          true;
+
+        submittingRef.current =
+          false;
+
+        setStartedAt(now);
+
+        startedAtRef.current =
+          now;
+
+        setRemainingSeconds(
+          duration * 60
         );
 
-        violationTimerRef.current =
-          setTimeout(() => {
-            if (
-              startedRef.current &&
-              document.visibilityState ===
-                "visible"
-            ) {
-              handleViolationRef.current?.(
-                "WINDOW_FOCUS_LOST"
-              );
-            }
-          }, 250);
-      };
+        remainingRef.current =
+          duration * 60;
 
-    const onFullscreenChange =
-      () => {
-        const active =
-          Boolean(
-            document.fullscreenElement
-          );
+        setCurrentIndex(0);
 
-        setFullscreenReady(
-          active
-        );
+        setAnswers({});
 
-        if (
-          startedRef.current &&
-          !active
-        ) {
-          handleViolationRef.current?.(
-            "FULLSCREEN_EXIT"
-          );
-        }
-      };
+        answersRef.current =
+          {};
 
-    const onContextMenu =
-      (event) => {
-        event.preventDefault();
-      };
-
-    const onCopy =
-      (event) =>
-        event.preventDefault();
-
-    const onCut =
-      (event) =>
-        event.preventDefault();
-
-    const onPaste =
-      (event) =>
-        event.preventDefault();
-
-    const onKeyDown =
-      (event) => {
-        const key =
-          event.key.toLowerCase();
-
-        const modifier =
-          event.ctrlKey ||
-          event.metaKey;
-
-        if (
-          (
-            modifier &&
-            [
-              "c",
-              "v",
-              "x",
-              "u",
-              "s",
-              "p",
-            ].includes(key)
-          ) ||
-          key === "f12" ||
-          (
-            event.ctrlKey &&
-            event.shiftKey &&
-            [
-              "i",
-              "j",
-              "c",
-            ].includes(key)
-          )
-        ) {
-          event.preventDefault();
-
-          handleViolationRef.current?.(
-            "PROHIBITED_KEYBOARD_ACTION"
-          );
-        }
-      };
-
-    document.addEventListener(
-      "visibilitychange",
-      onVisibilityChange
+        setPhase("running");
+      },
+      [startAttempt, testMeta]
     );
 
-    window.addEventListener(
-      "blur",
-      onBlur
-    );
-
-    document.addEventListener(
-      "fullscreenchange",
-      onFullscreenChange
-    );
-
-    document.addEventListener(
-      "contextmenu",
-      onContextMenu
-    );
-
-    document.addEventListener(
-      "copy",
-      onCopy
-    );
-
-    document.addEventListener(
-      "cut",
-      onCut
-    );
-
-    document.addEventListener(
-      "paste",
-      onPaste
-    );
-
-    document.addEventListener(
-      "keydown",
-      onKeyDown
-    );
-
-    return () => {
-      clearTimeout(
-        violationTimerRef.current
-      );
-
-      document.removeEventListener(
-        "visibilitychange",
-        onVisibilityChange
-      );
-
-      window.removeEventListener(
-        "blur",
-        onBlur
-      );
-
-      document.removeEventListener(
-        "fullscreenchange",
-        onFullscreenChange
-      );
-
-      document.removeEventListener(
-        "contextmenu",
-        onContextMenu
-      );
-
-      document.removeEventListener(
-        "copy",
-        onCopy
-      );
-
-      document.removeEventListener(
-        "cut",
-        onCut
-      );
-
-      document.removeEventListener(
-        "paste",
-        onPaste
-      );
-
-      document.removeEventListener(
-        "keydown",
-        onKeyDown
-      );
-    };
-  }, [phase]);
+  /* =======================================================
+     TIMER
+  ======================================================= */
 
   useEffect(() => {
     if (
@@ -1361,7 +767,9 @@ export default function AssessmentTest() {
             remainingRef.current =
               next;
 
-            if (next === 0) {
+            if (
+              next === 0
+            ) {
               clearInterval(
                 timerRef.current
               );
@@ -1384,6 +792,159 @@ export default function AssessmentTest() {
       );
   }, [phase]);
 
+  /* =======================================================
+     CALCULATE RESULT
+  ======================================================= */
+
+  const calculateResult =
+    useCallback(() => {
+      const currentQuestions =
+        questionsRef.current;
+
+      const currentAnswers =
+        answersRef.current;
+
+      let correctAnswers = 0;
+
+      const categoryStats =
+        {};
+
+      currentQuestions.forEach(
+        (question) => {
+          const category =
+            question.category ||
+            "GENERAL";
+
+          if (
+            !categoryStats[
+              category
+            ]
+          ) {
+            categoryStats[
+              category
+            ] = {
+              total: 0,
+              correct: 0,
+            };
+          }
+
+          categoryStats[
+            category
+          ].total += 1;
+
+          const selected =
+            currentAnswers[
+              question.id
+            ];
+
+          const correct =
+            question.correctAnswer;
+
+          if (
+            selected !==
+              undefined &&
+            correct !==
+              undefined &&
+            String(
+              selected
+            )
+              .trim()
+              .toLowerCase() ===
+              String(
+                correct
+              )
+                .trim()
+                .toLowerCase()
+          ) {
+            correctAnswers += 1;
+
+            categoryStats[
+              category
+            ].correct += 1;
+          }
+        }
+      );
+
+      const totalQuestions =
+        currentQuestions.length;
+
+      const answeredQuestions =
+        Object.keys(
+          currentAnswers
+        ).length;
+
+      const unansweredQuestions =
+        Math.max(
+          0,
+          totalQuestions -
+            answeredQuestions
+        );
+
+      const percentage =
+        totalQuestions
+          ? Math.round(
+              (correctAnswers /
+                totalQuestions) *
+                100
+            )
+          : 0;
+
+      const accuracy =
+        answeredQuestions
+          ? Math.round(
+              (correctAnswers /
+                answeredQuestions) *
+                100
+            )
+          : 0;
+
+      const categoryBreakdown =
+        Object.entries(
+          categoryStats
+        ).map(
+          ([name, data]) => ({
+            name,
+
+            total:
+              data.total,
+
+            correct:
+              data.correct,
+
+            score:
+              data.total
+                ? Math.round(
+                    (data.correct /
+                      data.total) *
+                      100
+                  )
+                : 0,
+          })
+        );
+
+      return {
+        totalQuestions,
+
+        answeredQuestions,
+
+        unansweredQuestions,
+
+        correctAnswers,
+
+        percentage,
+
+        score: percentage,
+
+        accuracy,
+
+        categoryBreakdown,
+      };
+    }, []);
+
+  /* =======================================================
+     SUBMIT
+  ======================================================= */
+
   const submitAssessment =
     useCallback(
       async (
@@ -1391,8 +952,7 @@ export default function AssessmentTest() {
       ) => {
         if (
           submittingRef.current ||
-          !startedRef.current ||
-          terminatingRef.current
+          !startedRef.current
         ) {
           return;
         }
@@ -1401,22 +961,87 @@ export default function AssessmentTest() {
           true;
 
         setSubmitting(true);
+        setSubmitError("");
 
         clearInterval(
           timerRef.current
         );
 
         try {
+          const calculated =
+            calculateResult();
+
           const duration =
             Number(
               testMeta?.durationMinutes
             ) || 20;
 
-          const currentAnswers =
-            answersRef.current;
+          const resultKey =
+            `${assessmentId}:${companyId || "general"}`;
 
-          const currentQuestions =
-            questionsRef.current;
+          const resultPayload = {
+            assessmentId,
+
+            companyId,
+
+            attemptId:
+              attemptIdRef.current,
+
+            resultKey,
+
+            roundType:
+              "aptitude",
+
+            assessmentTitle:
+              testMeta?.title ||
+              "Aptitude Assessment",
+
+            startedAt:
+              startedAtRef.current,
+
+            completedAt:
+              new Date().toISOString(),
+
+            totalQuestions:
+              calculated.totalQuestions,
+
+            answeredQuestions:
+              calculated.answeredQuestions,
+
+            unansweredQuestions:
+              calculated.unansweredQuestions,
+
+            correctAnswers:
+              calculated.correctAnswers,
+
+            score:
+              calculated.score,
+
+            percentage:
+              calculated.percentage,
+
+            accuracy:
+              calculated.accuracy,
+
+            categoryBreakdown:
+              calculated.categoryBreakdown,
+
+            timeAllowedSeconds:
+              duration * 60,
+
+            timeUsedSeconds:
+              Math.max(
+                0,
+                duration * 60 -
+                  remainingRef.current
+              ),
+
+            automaticSubmission:
+              automatic,
+
+            answers:
+              answersRef.current,
+          };
 
           const response =
             await apiFetch(
@@ -1424,142 +1049,67 @@ export default function AssessmentTest() {
               {
                 method: "POST",
 
-                body: JSON.stringify({
-                  assessmentId,
-
-                  companyId,
-
-                  attemptId:
-                    attemptIdRef.current,
-
-                  assessmentTitle:
-                    testMeta?.title ||
-                    "Aptitude Assessment",
-
-                  startedAt:
-                    startedAtRef.current,
-
-                  completedAt:
-                    new Date().toISOString(),
-
-                  answers:
-                    currentAnswers,
-
-                  totalQuestions:
-                    currentQuestions.length,
-
-                  answeredQuestions:
-                    Object.keys(
-                      currentAnswers
-                    ).length,
-
-                  unansweredQuestions:
-                    Math.max(
-                      0,
-                      currentQuestions.length -
-                        Object.keys(
-                          currentAnswers
-                        ).length
-                    ),
-
-                  timeAllowedSeconds:
-                    duration * 60,
-
-                  timeUsedSeconds:
-                    Math.max(
-                      0,
-                      duration * 60 -
-                        remainingRef.current
-                    ),
-
-                  automaticSubmission:
-                    automatic,
-
-                  terminated:
-                    false,
-
-                  proctoring: {
-                    status:
-                      violationsRef.current
-                        .length
-                        ? "VIOLATION"
-                        : "COMPLETED",
-
-                    violations:
-                      violationsRef.current,
-
-                    camera:
-                      cameraReady,
-
-                    microphone:
-                      microphoneReady,
-
-                    fullscreen:
-                      Boolean(
-                        document.fullscreenElement
-                      ),
-                  },
-                }),
+                body: JSON.stringify(
+                  resultPayload
+                ),
               }
             );
 
-          const result =
+          const payload =
             await response
               .json()
               .catch(() => ({}));
 
           if (!response.ok) {
             throw new Error(
-              result?.error?.message ||
+              payload?.error
+                ?.message ||
+                payload?.message ||
                 `Submission failed (${response.status}).`
             );
           }
 
-          const reportId =
-            result?.data?.attemptId ||
-            result?.attemptId ||
-            attemptIdRef.current;
+          const saved =
+            payload?.data ||
+            payload?.result ||
+            {};
 
-          if (!reportId) {
-            throw new Error(
-              "Assessment was submitted but no report ID was returned."
-            );
-          }
+          const finalResult = {
+            ...resultPayload,
 
-          stopMedia();
+            ...saved,
 
-          await exitFullscreen();
+            score:
+              saved?.score ??
+              saved?.percentage ??
+              calculated.score,
+
+            percentage:
+              saved?.percentage ??
+              saved?.score ??
+              calculated.percentage,
+
+            accuracy:
+              saved?.accuracy ??
+              calculated.accuracy,
+
+            categoryBreakdown:
+              saved?.categoryBreakdown ||
+              calculated.categoryBreakdown,
+          };
+
+          setResult(
+            finalResult
+          );
 
           startedRef.current =
             false;
 
-          setProctorStatus(
-            "COMPLETED"
+          setShowSubmitModal(
+            false
           );
 
-          navigate(
-            `/reports/${encodeURIComponent(
-              reportId
-            )}`,
-            {
-              replace: true,
-
-              state: {
-                source:
-                  "assessment",
-
-                assessmentId,
-
-                companyId,
-
-                assessmentTitle:
-                  testMeta?.title ||
-                  "Aptitude Assessment",
-
-                result,
-              },
-            }
-          );
+          setPhase("result");
         } catch (err) {
           console.error(
             "[ASSESSMENT SUBMIT]",
@@ -1571,21 +1121,17 @@ export default function AssessmentTest() {
 
           setSubmitting(false);
 
-          setError(
+          setSubmitError(
             err.message ||
-              "Unable to submit assessment."
+              "Unable to save assessment result."
           );
         }
       },
       [
         apiFetch,
         assessmentId,
-        cameraReady,
+        calculateResult,
         companyId,
-        exitFullscreen,
-        microphoneReady,
-        navigate,
-        stopMedia,
         testMeta,
       ]
     );
@@ -1595,62 +1141,158 @@ export default function AssessmentTest() {
       submitAssessment;
   }, [submitAssessment]);
 
-  useEffect(() => {
-    if (
-      phase !== "running"
-    ) {
-      return;
-    }
-
-    const heartbeat =
-      setInterval(() => {
-        sendProctorEvent(
-          "HEARTBEAT",
-          {
-            answerCount:
-              Object.keys(
-                answersRef.current
-              ).length,
-
-            remainingSeconds:
-              remainingRef.current,
-          }
-        );
-      }, 15000);
-
-    return () =>
-      clearInterval(
-        heartbeat
-      );
-  }, [
-    phase,
-    sendProctorEvent,
-  ]);
+  /* =======================================================
+     ANSWER
+  ======================================================= */
 
   const selectAnswer =
-    (questionId, value) => {
-      if (
-        phase !== "running"
-      ) {
-        return;
-      }
-
-      setAnswers(
-        (previous) => ({
-          ...previous,
-
-          [questionId]:
-            value,
-        })
-      );
-
-      sendProctorEvent(
-        "ANSWER_CHANGED",
-        {
-          questionId,
+    useCallback(
+      (
+        questionId,
+        value
+      ) => {
+        if (
+          phase !== "running"
+        ) {
+          return;
         }
+
+        setAnswers(
+          (previous) => {
+            const next = {
+              ...previous,
+
+              [questionId]:
+                value,
+            };
+
+            answersRef.current =
+              next;
+
+            return next;
+          }
+        );
+      },
+      [phase]
+    );
+
+  /* =======================================================
+     NAVIGATION
+  ======================================================= */
+
+  const goToQuestion =
+    useCallback(
+      (index) => {
+        if (
+          phase !== "running"
+        ) {
+          return;
+        }
+
+        if (
+          index < 0 ||
+          index >=
+            questions.length
+        ) {
+          return;
+        }
+
+        setCurrentIndex(index);
+      },
+      [phase, questions.length]
+    );
+
+  const nextQuestion =
+    useCallback(() => {
+      setCurrentIndex(
+        (index) =>
+          Math.min(
+            index + 1,
+            questions.length - 1
+          )
       );
+    }, [questions.length]);
+
+  const previousQuestion =
+    useCallback(() => {
+      setCurrentIndex(
+        (index) =>
+          Math.max(
+            index - 1,
+            0
+          )
+      );
+    }, []);
+
+  /* =======================================================
+     RETAKE
+  ======================================================= */
+
+  const retakeAssessment =
+    useCallback(() => {
+      clearInterval(
+        timerRef.current
+      );
+
+      setResult(null);
+
+      setAnswers({});
+
+      answersRef.current =
+        {};
+
+      setCurrentIndex(0);
+
+      setAttemptId(null);
+
+      attemptIdRef.current =
+        null;
+
+      setStartedAt(null);
+
+      startedAtRef.current =
+        null;
+
+      setSubmitError("");
+
+      const duration =
+        Number(
+          testMeta?.durationMinutes
+        ) || 20;
+
+      setRemainingSeconds(
+        duration * 60
+      );
+
+      remainingRef.current =
+        duration * 60;
+
+      setPhase("ready");
+    }, [testMeta]);
+
+  /* =======================================================
+     CLEANUP
+  ======================================================= */
+
+  useEffect(() => {
+    return () => {
+      clearInterval(
+        timerRef.current
+      );
+
+      startedRef.current =
+        false;
     };
+  }, []);
+
+  /* =======================================================
+     DERIVED DATA
+  ======================================================= */
+
+  const currentQuestion =
+    questions[
+      currentIndex
+    ] || null;
 
   const answeredCount =
     useMemo(
@@ -1665,8 +1307,11 @@ export default function AssessmentTest() {
     );
 
   const unansweredCount =
-    questions.length -
-    answeredCount;
+    Math.max(
+      0,
+      questions.length -
+        answeredCount
+    );
 
   const progressPercentage =
     questions.length
@@ -1676,59 +1321,6 @@ export default function AssessmentTest() {
             100
         )
       : 0;
-
-  const currentQuestion =
-    questions[currentIndex] ||
-    null;
-
-  const goToQuestion =
-    (index) => {
-      if (
-        phase !== "running" ||
-        index < 0 ||
-        index >= questions.length
-      ) {
-        return;
-      }
-
-      setCurrentIndex(index);
-    };
-
-  const nextQuestion =
-    () => {
-      setCurrentIndex(
-        (index) =>
-          Math.min(
-            index + 1,
-            questions.length - 1
-          )
-      );
-    };
-
-  const previousQuestion =
-    () => {
-      setCurrentIndex(
-        (index) =>
-          Math.max(
-            index - 1,
-            0
-          )
-      );
-    };
-
-  useEffect(() => {
-    return () => {
-      clearInterval(
-        timerRef.current
-      );
-
-      clearTimeout(
-        violationTimerRef.current
-      );
-
-      stopMedia();
-    };
-  }, [stopMedia]);
 
   const title =
     testMeta?.title ||
@@ -1741,20 +1333,24 @@ export default function AssessmentTest() {
       testMeta?.durationMinutes
     ) || 20;
 
+  /* =======================================================
+     LOADING
+  ======================================================= */
+
   if (
     phase === "loading"
   ) {
     return (
       <Shell>
-        <div className="at-loading">
-          <div className="at-spinner" />
+        <div className="assessment-loading">
+          <div className="loading-spinner" />
 
-          <div className="at-eyebrow">
-            ASSESSMENT ENGINE
-          </div>
+          <span className="eyebrow">
+            ENGVIVA / ASSESSMENT ENGINE
+          </span>
 
           <h1>
-            Preparing your secure test
+            Preparing your assessment
           </h1>
 
           <p>
@@ -1766,38 +1362,44 @@ export default function AssessmentTest() {
     );
   }
 
+  /* =======================================================
+     ERROR
+  ======================================================= */
+
   if (
     phase === "error"
   ) {
     return (
       <Shell>
-        <div className="at-error-card">
-          <div className="at-danger-icon">
+        <div className="error-page">
+          <div className="error-icon">
             !
           </div>
 
-          <div className="at-eyebrow">
+          <span className="eyebrow">
             ASSESSMENT ENGINE
-          </div>
+          </span>
 
           <h1>
-            Unable to load test
+            Unable to load assessment
           </h1>
 
           <p>
             {error}
           </p>
 
-          <div className="at-actions">
+          <div className="error-actions">
             <button
-              className="at-primary"
-              onClick={loadQuestions}
+              className="primary-button"
+              onClick={
+                loadQuestions
+              }
             >
-              RETRY ↻
+              RETRY
             </button>
 
             <button
-              className="at-secondary"
+              className="secondary-button"
               onClick={() =>
                 navigate(
                   "/practice/assessments"
@@ -1812,71 +1414,45 @@ export default function AssessmentTest() {
     );
   }
 
+  /* =======================================================
+     RESULT
+  ======================================================= */
+
   if (
-    phase === "terminated"
+    phase === "result"
   ) {
     return (
-      <Shell>
-        <div className="at-error-card">
-          <div className="at-danger-icon">
-            !
-          </div>
-
-          <div className="at-eyebrow">
-            PROCTORING TERMINATED
-          </div>
-
-          <h1>
-            Assessment failed
-          </h1>
-
-          <p>
-            This attempt was
-            terminated because a
-            proctoring rule was
-            violated.
-          </p>
-
-          <div className="at-reason">
-            <span>
-              VIOLATION
-            </span>
-
-            <strong>
-              {terminationReason}
-            </strong>
-          </div>
-
-          <button
-            className="at-primary"
-            onClick={() =>
-              navigate(
-                "/practice/assessments"
-              )
-            }
-          >
-            BACK TO ASSESSMENTS →
-          </button>
-        </div>
-      </Shell>
+      <ResultScreen
+        result={result}
+        testMeta={testMeta}
+        company={company}
+        onRetake={
+          retakeAssessment
+        }
+        onDashboard={() =>
+          navigate(
+            "/dashboard"
+          )
+        }
+      />
     );
   }
+
+  /* =======================================================
+     READY
+  ======================================================= */
 
   if (
     phase === "ready"
   ) {
-    const mediaReady =
-      cameraReady &&
-      microphoneReady;
-
     return (
       <Shell>
-        <div className="at-pre">
-          <header className="at-pre-head">
+        <div className="ready-page">
+          <div className="ready-header">
             <div>
-              <div className="at-eyebrow">
-                ENGVIVA / PROCTORED LAB
-              </div>
+              <span className="eyebrow">
+                ENGVIVA / PRACTICE
+              </span>
 
               <h1>
                 {title}
@@ -1886,9 +1462,7 @@ export default function AssessmentTest() {
                 {company?.name ||
                   companyId ||
                   "Engineering Assessment"}
-
                 {" · "}
-
                 {questions.length}
                 {" questions · "}
                 {durationMinutes}
@@ -1896,199 +1470,146 @@ export default function AssessmentTest() {
               </p>
             </div>
 
-            <div className="at-secure">
-              <i />
-              SECURE SESSION
+            <div className="ready-badge">
+              <span />
+              READY TO BEGIN
             </div>
-          </header>
+          </div>
 
-          <div className="at-pre-grid">
+          <div className="ready-grid">
             <section>
-              <div className="at-intro-card">
-                <div className="at-number">
+              <div className="overview-card">
+                <div className="overview-number">
                   01
                 </div>
 
                 <div>
-                  <div className="at-card-label">
+                  <span className="card-label">
                     ASSESSMENT OVERVIEW
-                  </div>
+                  </span>
 
                   <h2>
-                    You're entering
-                    proctoring mode.
+                    Test your engineering
+                    aptitude.
                   </h2>
 
                   <p>
-                    Camera, microphone
-                    and fullscreen are
-                    checked before the
-                    timer starts.
-                    Leaving the
-                    assessment can
-                    terminate it
-                    automatically.
+                    This assessment contains
+                    company-focused aptitude
+                    questions. Answer every
+                    question carefully before
+                    submitting.
                   </p>
                 </div>
               </div>
 
-              <div className="at-panel">
-                <div className="at-panel-head">
-                  <h3>
-                    Proctoring rules
-                  </h3>
+              <div className="info-panel">
+                <div className="panel-title">
+                  <div>
+                    <span>
+                      WHAT TO EXPECT
+                    </span>
 
-                  <span>
-                    REQUIRED
-                  </span>
+                    <h3>
+                      Simple. Direct.
+                      Focused.
+                    </h3>
+                  </div>
                 </div>
 
-                {RULES.map(
-                  (rule, index) => (
-                    <div
-                      className="at-rule"
-                      key={rule}
-                    >
-                      <b>
-                        {String(
-                          index + 1
-                        ).padStart(
-                          2,
-                          "0"
-                        )}
-                      </b>
+                <InfoRow
+                  number="01"
+                  title="Timed assessment"
+                  text={`${durationMinutes} minutes to complete the test.`}
+                />
 
-                      <span>
-                        {rule}
-                      </span>
-                    </div>
-                  )
-                )}
+                <InfoRow
+                  number="02"
+                  title="Dynamic questions"
+                  text={`${questions.length} questions loaded from the assessment database.`}
+                />
+
+                <InfoRow
+                  number="03"
+                  title="Instant analysis"
+                  text="Your score and category performance appear immediately after submission."
+                />
+
+                <InfoRow
+                  number="04"
+                  title="Retake supported"
+                  text="You can attempt the same assessment again and your latest result can replace the previous dashboard result."
+                />
               </div>
             </section>
 
             <aside>
-              <div className="at-panel">
-                <div className="at-panel-head">
-                  <h3>
-                    System check
-                  </h3>
-
-                  <span
-                    className={
-                      mediaReady
-                        ? "at-pass"
-                        : "at-wait"
-                    }
-                  >
-                    {mediaReady
-                      ? "READY"
-                      : "ACTION REQUIRED"}
-                  </span>
+              <div className="start-card">
+                <div className="start-icon">
+                  E
                 </div>
 
-                <SystemCheck
-                  title="Camera"
-                  text="Live camera feed"
-                  ready={
-                    cameraReady
-                  }
-                />
+                <span className="card-label">
+                  TEST DETAILS
+                </span>
 
-                <SystemCheck
-                  title="Microphone"
-                  text="Live audio input"
-                  ready={
-                    microphoneReady
-                  }
-                />
+                <h2>
+                  Ready?
+                </h2>
 
-                <SystemCheck
-                  title="Fullscreen"
-                  text="Activated when test starts"
-                  ready={
-                    fullscreenReady
-                  }
-                />
+                <p>
+                  There is no camera,
+                  microphone or special
+                  browser permission required.
+                </p>
+
+                <div className="detail-grid">
+                  <Detail
+                    value={
+                      questions.length
+                    }
+                    label="QUESTIONS"
+                  />
+
+                  <Detail
+                    value={`${durationMinutes}m`}
+                    label="TIME"
+                  />
+
+                  <Detail
+                    value="MCQ"
+                    label="FORMAT"
+                  />
+
+                  <Detail
+                    value="∞"
+                    label="RETAKES"
+                  />
+                </div>
 
                 <button
-                  className="at-check"
+                  className="start-button"
                   onClick={
-                    requestMedia
+                    startAssessment
                   }
                 >
-                  CHECK CAMERA & MIC
+                  START ASSESSMENT
+                  <span>
+                    →
+                  </span>
                 </button>
 
-                {cameraReady && (
-                  <div className="at-preview">
-                    <video
-                      ref={
-                        cameraRef
-                      }
-                      autoPlay
-                      muted
-                      playsInline
-                    />
-
-                    <span>
-                      CAMERA PREVIEW
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="at-stats">
-                <Stat
-                  value={
-                    questions.length
+                <button
+                  className="back-link"
+                  onClick={() =>
+                    navigate(
+                      "/practice/assessments"
+                    )
                   }
-                  label="QUESTIONS"
-                />
-
-                <Stat
-                  value={`${durationMinutes}m`}
-                  label="TIME LIMIT"
-                />
-
-                <Stat
-                  value="MCQ"
-                  label="FORMAT"
-                />
+                >
+                  Return to assessments
+                </button>
               </div>
-
-              {error && (
-                <div className="at-inline-error">
-                  {error}
-                </div>
-              )}
-
-              <button
-                className={
-                  mediaReady
-                    ? "at-start"
-                    : "at-start disabled"
-                }
-                disabled={
-                  !mediaReady
-                }
-                onClick={
-                  startAssessment
-                }
-              >
-                ENTER PROCTORED TEST →
-              </button>
-
-              <button
-                className="at-link"
-                onClick={() =>
-                  navigate(
-                    "/practice/assessments"
-                  )
-                }
-              >
-                Cancel and return
-              </button>
             </aside>
           </div>
         </div>
@@ -2096,15 +1617,21 @@ export default function AssessmentTest() {
     );
   }
 
+  /* =======================================================
+     RUNNING
+  ======================================================= */
+
   return (
-    <div className="at-running">
+    <div className="assessment-running">
       <style>
-        {CSS}
+        {ASSESSMENT_CSS}
       </style>
 
-      <header className="at-top">
-        <div className="at-brand">
-          <b>E</b>
+      <header className="test-header">
+        <div className="brand">
+          <div className="brand-mark">
+            E
+          </div>
 
           <div>
             <strong>
@@ -2112,12 +1639,12 @@ export default function AssessmentTest() {
             </strong>
 
             <small>
-              PROCTORED LAB
+              ASSESSMENT
             </small>
           </div>
         </div>
 
-        <div className="at-identity">
+        <div className="test-title">
           <strong>
             {title}
           </strong>
@@ -2129,17 +1656,17 @@ export default function AssessmentTest() {
           </span>
         </div>
 
-        <div className="at-top-right">
+        <div className="header-right">
           <div
             className={
               remainingSeconds <=
               60
-                ? "at-timer danger"
-                : "at-timer"
+                ? "timer danger"
+                : "timer"
             }
           >
             <small>
-              TIME
+              TIME LEFT
             </small>
 
             <strong>
@@ -2149,18 +1676,14 @@ export default function AssessmentTest() {
             </strong>
           </div>
 
-          <div className="at-live">
-            <i />
-
-            {proctorStatus ===
-            "ACTIVE"
-              ? "PROCTOR ACTIVE"
-              : proctorStatus}
+          <div className="question-progress">
+            {answeredCount}/
+            {questions.length}
           </div>
         </div>
       </header>
 
-      <div className="at-progress">
+      <div className="progress-line">
         <span
           style={{
             width: `${progressPercentage}%`,
@@ -2168,9 +1691,9 @@ export default function AssessmentTest() {
         />
       </div>
 
-      <main className="at-layout">
-        <aside className="at-question-nav">
-          <div className="at-nav-head">
+      <main className="test-layout">
+        <aside className="question-sidebar">
+          <div className="sidebar-heading">
             <strong>
               QUESTIONS
             </strong>
@@ -2181,7 +1704,7 @@ export default function AssessmentTest() {
             </span>
           </div>
 
-          <div className="at-question-grid">
+          <div className="question-grid">
             {questions.map(
               (
                 question,
@@ -2201,11 +1724,6 @@ export default function AssessmentTest() {
                     key={
                       question.id
                     }
-                    onClick={() =>
-                      goToQuestion(
-                        index
-                      )
-                    }
                     className={[
                       current
                         ? "current"
@@ -2214,6 +1732,11 @@ export default function AssessmentTest() {
                         ? "answered"
                         : "",
                     ].join(" ")}
+                    onClick={() =>
+                      goToQuestion(
+                        index
+                      )
+                    }
                   >
                     {String(
                       index + 1
@@ -2227,40 +1750,44 @@ export default function AssessmentTest() {
             )}
           </div>
 
-          <div className="at-legend">
+          <div className="sidebar-legend">
             <Legend
               label="Current"
-              className="current"
+              type="current"
             />
 
             <Legend
               label="Answered"
-              className="answered"
+              type="answered"
             />
 
             <Legend
               label="Unanswered"
-              className="empty"
+              type="empty"
             />
           </div>
 
-          <div className="at-nav-footer">
-            <i />
+          <div className="sidebar-summary">
+            <span>
+              PROGRESS
+            </span>
+
+            <strong>
+              {progressPercentage}%
+            </strong>
 
             <div>
-              <strong>
-                PROCTORING
-              </strong>
-
-              <span>
-                Camera active
-              </span>
+              <i
+                style={{
+                  width: `${progressPercentage}%`,
+                }}
+              />
             </div>
           </div>
         </aside>
 
-        <section className="at-question-area">
-          <div className="at-q-head">
+        <section className="question-section">
+          <div className="question-top">
             <div>
               <span>
                 QUESTION{" "}
@@ -2293,8 +1820,8 @@ export default function AssessmentTest() {
             </em>
           </div>
 
-          <div className="at-question-card">
-            <div className="at-q-number">
+          <div className="question-card">
+            <div className="question-number">
               {String(
                 currentIndex + 1
               ).padStart(
@@ -2309,7 +1836,7 @@ export default function AssessmentTest() {
               }
             </h1>
 
-            <div className="at-options">
+            <div className="options">
               {currentQuestion?.options.map(
                 (
                   option,
@@ -2319,9 +1846,9 @@ export default function AssessmentTest() {
                     typeof option ===
                     "object"
                       ? firstValue(
-                          option.value,
-                          option.text,
-                          option.label
+                          option?.value,
+                          option?.text,
+                          option?.label
                         )
                       : option;
 
@@ -2369,9 +1896,9 @@ export default function AssessmentTest() {
             </div>
           </div>
 
-          <div className="at-q-actions">
+          <div className="question-actions">
             <button
-              className="at-prev"
+              className="previous-button"
               disabled={
                 currentIndex ===
                 0
@@ -2383,7 +1910,7 @@ export default function AssessmentTest() {
               ← PREVIOUS
             </button>
 
-            <div className="at-answer-state">
+            <div className="answer-state">
               {answers[
                 currentQuestion?.id
               ] !== undefined
@@ -2394,7 +1921,7 @@ export default function AssessmentTest() {
             {currentIndex <
             questions.length - 1 ? (
               <button
-                className="at-next"
+                className="next-button"
                 onClick={
                   nextQuestion
                 }
@@ -2403,7 +1930,7 @@ export default function AssessmentTest() {
               </button>
             ) : (
               <button
-                className="at-finish"
+                className="finish-button"
                 onClick={() =>
                   setShowSubmitModal(
                     true
@@ -2415,119 +1942,46 @@ export default function AssessmentTest() {
             )}
           </div>
         </section>
-
-        <aside className="at-proctor">
-          <div className="at-camera">
-            <div className="at-camera-head">
-              <div>
-                <strong>
-                  LIVE CAMERA
-                </strong>
-
-                <span>
-                  <i /> MONITORING
-                </span>
-              </div>
-
-              <b>
-                ● REC
-              </b>
-            </div>
-
-            <div className="at-video">
-              <video
-                ref={cameraRef}
-                autoPlay
-                muted
-                playsInline
-              />
-
-              <span>
-                ENGVIVA PROCTOR
-              </span>
-            </div>
-
-            <CheckLine
-              title="Camera"
-              ready={
-                cameraReady
-              }
-            />
-
-            <CheckLine
-              title="Microphone"
-              ready={
-                microphoneReady
-              }
-            />
-
-            <CheckLine
-              title="Fullscreen"
-              ready={
-                fullscreenReady
-              }
-            />
-          </div>
-
-          <div className="at-security">
-            <b>
-              ◈
-            </b>
-
-            <div>
-              <strong>
-                Secure session
-              </strong>
-
-              <p>
-                Tab switching,
-                fullscreen exit
-                and window focus
-                loss can terminate
-                this attempt.
-              </p>
-            </div>
-          </div>
-        </aside>
       </main>
 
       {showSubmitModal && (
-        <div className="at-modal-backdrop">
-          <div className="at-modal">
-            <div className="at-modal-icon">
+        <div className="modal-backdrop">
+          <div className="submit-modal">
+            <div className="modal-icon">
               ✓
             </div>
 
-            <div className="at-eyebrow">
+            <span className="eyebrow">
               FINAL SUBMISSION
-            </div>
+            </span>
 
             <h2>
-              Submit your assessment?
+              Submit assessment?
             </h2>
 
             <p>
-              You cannot modify
-              your answers after
-              submission.
+              Once submitted, your
+              answers will be evaluated
+              and your performance
+              analysis will be generated.
             </p>
 
-            <div className="at-summary">
-              <Stat
+            <div className="modal-stats">
+              <Detail
                 value={
                   answeredCount
                 }
                 label="ANSWERED"
               />
 
-              <Stat
+              <Detail
                 value={
                   unansweredCount
                 }
                 label="UNANSWERED"
               />
 
-              <Stat
+              <Detail
                 value={formatTime(
                   remainingSeconds
                 )}
@@ -2535,43 +1989,43 @@ export default function AssessmentTest() {
               />
             </div>
 
-            <div className="at-modal-actions">
+            {submitError && (
+              <div className="submit-error">
+                {submitError}
+              </div>
+            )}
+
+            <div className="modal-actions">
               <button
-                className="at-secondary"
+                className="secondary-button"
+                disabled={
+                  submitting
+                }
                 onClick={() =>
                   setShowSubmitModal(
                     false
                   )
-                }
-                disabled={
-                  submitting
                 }
               >
                 CONTINUE TEST
               </button>
 
               <button
-                className="at-primary"
+                className="primary-button"
+                disabled={
+                  submitting
+                }
                 onClick={() =>
                   submitAssessment(
                     false
                   )
                 }
-                disabled={
-                  submitting
-                }
               >
                 {submitting
-                  ? "SUBMITTING..."
-                  : "SUBMIT ASSESSMENT →"}
+                  ? "SAVING RESULT..."
+                  : "SUBMIT & ANALYSE →"}
               </button>
             </div>
-
-            {error && (
-              <div className="at-inline-error">
-                {error}
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -2579,13 +2033,308 @@ export default function AssessmentTest() {
   );
 }
 
+/* =========================================================
+   RESULT SCREEN
+========================================================= */
+
+function ResultScreen({
+  result,
+  testMeta,
+  company,
+  onRetake,
+  onDashboard,
+}) {
+  const score =
+    Number(
+      result?.percentage ??
+        result?.score ??
+        0
+    );
+
+  const accuracy =
+    Number(
+      result?.accuracy ||
+        0
+    );
+
+  const correct =
+    Number(
+      result?.correctAnswers ||
+        0
+    );
+
+  const total =
+    Number(
+      result?.totalQuestions ||
+        0
+    );
+
+  const answered =
+    Number(
+      result?.answeredQuestions ||
+        0
+    );
+
+  const breakdown =
+    Array.isArray(
+      result?.categoryBreakdown
+    )
+      ? result.categoryBreakdown
+      : [];
+
+  let verdict =
+    "Keep practising";
+
+  if (score >= 90) {
+    verdict =
+      "Outstanding performance";
+  } else if (score >= 80) {
+    verdict =
+      "Excellent performance";
+  } else if (score >= 70) {
+    verdict =
+      "Strong performance";
+  } else if (score >= 50) {
+    verdict =
+      "Developing performance";
+  }
+
+  return (
+    <div className="result-screen">
+      <style>
+        {RESULT_CSS}
+      </style>
+
+      <div className="result-container">
+        <header className="result-header">
+          <div>
+            <span className="eyebrow">
+              ASSESSMENT COMPLETE
+            </span>
+
+            <h1>
+              Your performance.
+            </h1>
+
+            <p>
+              {company?.name ||
+                "Engineering Assessment"}
+              {" · "}
+              {testMeta?.title ||
+                "Aptitude Assessment"}
+            </p>
+          </div>
+
+          <div className="completed-badge">
+            <span>
+              ✓
+            </span>
+
+            COMPLETED
+          </div>
+        </header>
+
+        <section className="score-hero">
+          <div className="score-circle">
+            <div>
+              <strong>
+                {score}
+              </strong>
+
+              <span>
+                / 100
+              </span>
+            </div>
+          </div>
+
+          <div className="score-copy">
+            <span>
+              OVERALL PERFORMANCE
+            </span>
+
+            <h2>
+              {verdict}
+            </h2>
+
+            <p>
+              You answered{" "}
+              <strong>
+                {correct}
+              </strong>{" "}
+              correctly out of{" "}
+              <strong>
+                {total}
+              </strong>{" "}
+              questions.
+            </p>
+
+            <small>
+              Latest result saved for
+              this assessment.
+            </small>
+          </div>
+        </section>
+
+        <section className="metrics">
+          <Metric
+            value={`${score}%`}
+            label="SCORE"
+          />
+
+          <Metric
+            value={`${accuracy}%`}
+            label="ACCURACY"
+          />
+
+          <Metric
+            value={correct}
+            label="CORRECT"
+          />
+
+          <Metric
+            value={answered}
+            label="ANSWERED"
+          />
+        </section>
+
+        <section className="analysis-panel">
+          <div className="analysis-heading">
+            <div>
+              <span>
+                PERFORMANCE ANALYSIS
+              </span>
+
+              <h2>
+                Category breakdown
+              </h2>
+            </div>
+
+            <small>
+              LATEST ATTEMPT
+            </small>
+          </div>
+
+          {breakdown.length >
+          0 ? (
+            <div className="breakdown-list">
+              {breakdown.map(
+                (
+                  item,
+                  index
+                ) => {
+                  const value =
+                    Math.max(
+                      0,
+                      Math.min(
+                        100,
+                        Number(
+                          item?.score
+                        ) || 0
+                      )
+                    );
+
+                  return (
+                    <div
+                      className="breakdown-row"
+                      key={`${item?.name}-${index}`}
+                    >
+                      <div className="breakdown-title">
+                        <span>
+                          {item?.name ||
+                            "General"}
+                        </span>
+
+                        <strong>
+                          {value}%
+                        </strong>
+                      </div>
+
+                      <div className="breakdown-track">
+                        <i
+                          style={{
+                            width: `${value}%`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="breakdown-meta">
+                        {item?.correct ??
+                          0}{" "}
+                        correct /{" "}
+                        {item?.total ??
+                          0}{" "}
+                        questions
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          ) : (
+            <div className="empty-analysis">
+              <div>
+                —
+              </div>
+
+              <p>
+                Category-level analysis
+                is not available for
+                this assessment.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <div className="result-note">
+          <div>
+            ✓
+          </div>
+
+          <p>
+            This result is stored as
+            the latest performance for
+            this assessment. If you
+            retake the same assessment,
+            the latest result can update
+            the dashboard analysis.
+          </p>
+        </div>
+
+        <div className="result-actions">
+          <button
+            className="result-secondary"
+            onClick={
+              onRetake
+            }
+          >
+            RETAKE ASSESSMENT
+          </button>
+
+          <button
+            className="result-primary"
+            onClick={
+              onDashboard
+            }
+          >
+            VIEW DASHBOARD →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   SMALL COMPONENTS
+========================================================= */
+
 function Shell({
   children,
 }) {
   return (
-    <div className="at-shell">
+    <div className="assessment-shell">
       <style>
-        {CSS}
+        {ASSESSMENT_CSS}
       </style>
 
       {children}
@@ -2593,17 +2342,15 @@ function Shell({
   );
 }
 
-function SystemCheck({
+function InfoRow({
+  number,
   title,
   text,
-  ready,
 }) {
   return (
-    <div className="at-system">
-      <div className="at-system-icon">
-        {ready
-          ? "✓"
-          : "○"}
+    <div className="info-row">
+      <div className="info-number">
+        {number}
       </div>
 
       <div>
@@ -2615,76 +2362,16 @@ function SystemCheck({
           {text}
         </span>
       </div>
-
-      <b
-        className={
-          ready
-            ? "ready"
-            : ""
-        }
-      >
-        {ready
-          ? "READY"
-          : "WAITING"}
-      </b>
     </div>
   );
 }
 
-function CheckLine({
-  title,
-  ready,
-}) {
-  return (
-    <div className="at-check-line">
-      <span
-        className={
-          ready
-            ? "ready"
-            : ""
-        }
-      >
-        {ready
-          ? "✓"
-          : "○"}
-      </span>
-
-      <strong>
-        {title}
-      </strong>
-
-      <em>
-        {ready
-          ? "READY"
-          : "WAIT"}
-      </em>
-    </div>
-  );
-}
-
-function Legend({
-  label,
-  className,
-}) {
-  return (
-    <div className="at-legend-item">
-      <i
-        className={
-          className
-        }
-      />
-
-      {label}
-    </div>
-  );
-}
-
-function Stat({
+function Detail({
   value,
   label,
 }) {
   return (
-    <div className="at-stat">
+    <div className="detail">
       <strong>
         {value}
       </strong>
@@ -2696,7 +2383,45 @@ function Stat({
   );
 }
 
-const CSS = `
+function Legend({
+  label,
+  type,
+}) {
+  return (
+    <div className="legend">
+      <i
+        className={type}
+      />
+
+      <span>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function Metric({
+  value,
+  label,
+}) {
+  return (
+    <div className="metric">
+      <span>
+        {label}
+      </span>
+
+      <strong>
+        {value}
+      </strong>
+    </div>
+  );
+}
+
+/* =========================================================
+   MAIN / ASSESSMENT CSS
+========================================================= */
+
+const ASSESSMENT_CSS = `
 * {
   box-sizing: border-box;
 }
@@ -2705,18 +2430,18 @@ button {
   font: inherit;
 }
 
-.at-shell,
-.at-running {
+.assessment-shell,
+.assessment-running {
   min-height: 100vh;
+  width: 100%;
   color: #f7f5fb;
   background:
     radial-gradient(
-      circle at 85% 5%,
-      rgba(171,130,255,.12),
-      transparent 30%
+      circle at 80% 0%,
+      rgba(160,110,255,.12),
+      transparent 32%
     ),
     #07060b;
-
   font-family:
     Inter,
     ui-sans-serif,
@@ -2727,124 +2452,145 @@ button {
     sans-serif;
 }
 
-.at-loading,
-.at-error-card {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 30px;
-  text-align: center;
+.eyebrow {
+  color: #a88bd0;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 2px;
 }
 
-.at-spinner {
-  width: 52px;
-  height: 52px;
+.assessment-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: 30px;
+}
+
+.loading-spinner {
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
-  border: 4px solid rgba(201,167,255,.15);
+  border:
+    4px solid rgba(201,167,255,.12);
   border-top-color: #c9a7ff;
-  animation: atspin 1s linear infinite;
+  animation:
+    assessment-spin
+    1s linear infinite;
   margin-bottom: 25px;
 }
 
-@keyframes atspin {
+@keyframes assessment-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-.at-loading h1,
-.at-error-card h1 {
-  margin: 8px 0;
-  font-size: 34px;
-  letter-spacing: -1px;
+.assessment-loading h1 {
+  margin: 12px 0 8px;
+  font-size: 36px;
 }
 
-.at-loading p,
-.at-error-card > p {
-  color: #85808d;
-  font-size: 13px;
-  line-height: 1.6;
-  max-width: 580px;
+.assessment-loading p {
+  margin: 0;
+  color: #807986;
+  font-size: 14px;
 }
 
-.at-error-card {
-  width: min(620px, calc(100% - 30px));
-  min-height: auto;
+.error-page {
+  width:
+    min(650px, calc(100% - 30px));
   margin: 12vh auto;
-  padding: 40px;
+  padding: 45px;
   border:
     1px solid rgba(255,255,255,.08);
   border-radius: 28px;
   background:
-    rgba(255,255,255,.035);
+    rgba(255,255,255,.03);
+  text-align: center;
 }
 
-.at-danger-icon {
-  width: 66px;
-  height: 66px;
+.error-icon {
+  width: 65px;
+  height: 65px;
+  margin: 0 auto 20px;
   border-radius: 20px;
+  display: grid;
+  place-items: center;
+  color: #ff8b9b;
   background:
     rgba(255,80,100,.08);
   border:
     1px solid rgba(255,80,100,.18);
-  color: #ff8192;
-  display: grid;
-  place-items: center;
   font-size: 25px;
   font-weight: 950;
-  margin-bottom: 20px;
 }
 
-.at-actions,
-.at-modal-actions {
+.error-page h1 {
+  font-size: 34px;
+  margin: 12px 0;
+}
+
+.error-page p {
+  color: #817b88;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.error-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  width: 100%;
-  margin-top: 22px;
+  margin-top: 25px;
 }
 
-.at-primary,
-.at-secondary,
-.at-check,
-.at-start,
-.at-link {
+.primary-button,
+.secondary-button {
+  min-height: 50px;
   border-radius: 13px;
-  min-height: 48px;
-  cursor: pointer;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 950;
   letter-spacing: 1px;
+  cursor: pointer;
 }
 
-.at-primary {
+.primary-button {
   border: 0;
+  color: #160d20;
   background:
     linear-gradient(
       135deg,
-      #d8c2ff,
-      #b38bf1
+      #dccaff,
+      #ad82ec
     );
-  color: #160c1e;
 }
 
-.at-secondary {
+.secondary-button {
   border:
     1px solid rgba(255,255,255,.08);
+  color: #b5aebb;
   background:
     rgba(255,255,255,.035);
-  color: #aaa3b0;
 }
 
-.at-pre {
-  width: min(1250px, calc(100% - 50px));
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* READY */
+
+.ready-page {
+  width:
+    min(1250px, calc(100% - 50px));
   margin: auto;
   padding: 55px 0 80px;
 }
 
-.at-pre-head {
+.ready-header {
   display: flex;
   justify-content: space-between;
   gap: 30px;
@@ -2852,48 +2598,46 @@ button {
   margin-bottom: 35px;
 }
 
-.at-pre-head h1 {
-  margin: 9px 0 5px;
-  font-size: clamp(34px, 5vw, 56px);
+.ready-header h1 {
+  margin: 10px 0 7px;
+  font-size:
+    clamp(38px, 5vw, 62px);
   line-height: 1;
   letter-spacing: -2px;
 }
 
-.at-pre-head p {
+.ready-header p {
+  color: #817b88;
+  font-size: 14px;
   margin: 0;
-  color: #827b89;
-  font-size: 13px;
 }
 
-.at-secure {
-  padding: 10px 14px;
-  border:
-    1px solid rgba(201,167,255,.18);
-  border-radius: 14px;
-  color: #c9a7ff;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 1px;
+.ready-badge {
   display: flex;
-  gap: 8px;
   align-items: center;
-  white-space: nowrap;
+  gap: 9px;
+  padding: 12px 15px;
+  border-radius: 13px;
+  border:
+    1px solid rgba(120,215,150,.16);
+  background:
+    rgba(120,215,150,.04);
+  color: #91dba8;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 1px;
 }
 
-.at-secure i,
-.at-live i,
-.at-camera-head span i,
-.at-nav-footer > i {
+.ready-badge span {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: #7edb9b;
   box-shadow:
     0 0 12px rgba(126,219,155,.8);
-  display: inline-block;
 }
 
-.at-pre-grid {
+.ready-grid {
   display: grid;
   grid-template-columns:
     minmax(0, 1.25fr)
@@ -2901,499 +2645,446 @@ button {
   gap: 20px;
 }
 
-.at-intro-card,
-.at-panel {
+.overview-card,
+.info-panel,
+.start-card {
   border:
     1px solid rgba(255,255,255,.07);
-  border-radius: 25px;
+  border-radius: 26px;
   background:
     rgba(255,255,255,.025);
 }
 
-.at-intro-card {
-  padding: 30px;
+.overview-card {
   display: flex;
   gap: 20px;
+  padding: 30px;
   margin-bottom: 18px;
 }
 
-.at-number {
+.overview-number {
   width: 52px;
   height: 52px;
   border-radius: 16px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
   background:
     rgba(201,167,255,.08);
   color: #c9a7ff;
-  display: grid;
-  place-items: center;
   font-weight: 950;
-  flex-shrink: 0;
 }
 
-.at-card-label {
-  color: #7d7586;
+.card-label {
+  color: #7f7788;
   font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 1.7px;
+  font-weight: 950;
+  letter-spacing: 1.6px;
 }
 
-.at-intro-card h2 {
-  margin: 8px 0;
-  font-size: 25px;
+.overview-card h2 {
+  margin: 9px 0;
+  font-size: 27px;
 }
 
-.at-intro-card p {
+.overview-card p {
   margin: 0;
-  color: #88818e;
-  font-size: 13px;
-  line-height: 1.7;
+  max-width: 720px;
+  color: #85808d;
+  font-size: 14px;
+  line-height: 1.75;
 }
 
-.at-panel {
-  padding: 24px;
+.info-panel {
+  padding: 25px;
 }
 
-.at-panel-head {
+.panel-title {
+  padding-bottom: 16px;
+  border-bottom:
+    1px solid rgba(255,255,255,.06);
+}
+
+.panel-title h3 {
+  margin: 7px 0 0;
+  font-size: 18px;
+}
+
+.info-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.at-panel-head h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.at-panel-head > span {
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  color: #c9a7ff;
-}
-
-.at-panel-head .at-pass {
-  color: #9ee6b4;
-}
-
-.at-panel-head .at-wait {
-  color: #c9a7ff;
-}
-
-.at-rule {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  padding: 13px 0;
-  border-top:
+  gap: 14px;
+  padding: 17px 0;
+  border-bottom:
     1px solid rgba(255,255,255,.05);
-  color: #a39ca9;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
-.at-rule b {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background:
-    rgba(201,167,255,.06);
-  color: #a88bcf;
+.info-row:last-child {
+  border-bottom: 0;
+}
+
+.info-number {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
-  font-size: 8px;
   flex-shrink: 0;
-}
-
-.at-system {
-  display: grid;
-  grid-template-columns:
-    38px 1fr auto;
-  gap: 11px;
-  align-items: center;
-  padding: 13px 0;
-  border-top:
-    1px solid rgba(255,255,255,.05);
-}
-
-.at-system-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 11px;
   background:
     rgba(201,167,255,.07);
-  color: #8a778f;
-  display: grid;
-  place-items: center;
+  color: #a88bd0;
+  font-size: 9px;
   font-weight: 950;
 }
 
-.at-system strong {
+.info-row strong,
+.info-row span {
   display: block;
-  font-size: 12px;
 }
 
-.at-system span {
+.info-row strong {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.info-row span {
+  color: #77717e;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.start-card {
+  padding: 28px;
+  position: sticky;
+  top: 20px;
+}
+
+.start-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 25px;
+  background:
+    linear-gradient(
+      135deg,
+      #dccaff,
+      #a87ce7
+    );
+  color: #180d21;
+  font-weight: 950;
+  font-size: 20px;
+}
+
+.start-card h2 {
+  margin: 10px 0;
+  font-size: 32px;
+}
+
+.start-card p {
+  color: #7e7885;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, 1fr);
+  gap: 9px;
+  margin: 20px 0;
+}
+
+.detail {
+  min-height: 75px;
+  border-radius: 14px;
+  border:
+    1px solid rgba(255,255,255,.06);
+  background:
+    rgba(255,255,255,.025);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail strong {
+  font-size: 20px;
+}
+
+.detail span {
+  color: #716a79;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 1px;
+}
+
+.start-button {
+  width: 100%;
+  height: 54px;
+  border: 0;
+  border-radius: 14px;
+  cursor: pointer;
+  color: #170d20;
+  background:
+    linear-gradient(
+      135deg,
+      #dccaff,
+      #a97de8
+    );
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 17px;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 1px;
+}
+
+.start-button span {
+  font-size: 18px;
+}
+
+.back-link {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #68616e;
+  margin-top: 13px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+/* RUNNING */
+
+.assessment-running {
+  display: flex;
+  flex-direction: column;
+}
+
+.test-header {
+  min-height: 76px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  border-bottom:
+    1px solid rgba(255,255,255,.07);
+  background:
+    rgba(8,7,12,.98);
+}
+
+.brand {
+  min-width: 175px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: #170d20;
+  background:
+    linear-gradient(
+      135deg,
+      #dccaff,
+      #a97de8
+    );
+  font-weight: 950;
+}
+
+.brand strong,
+.brand small {
   display: block;
-  color: #77707f;
+}
+
+.brand strong {
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.brand small {
+  color: #6d6675;
+  font-size: 7px;
+  margin-top: 2px;
+  letter-spacing: 1.5px;
+  font-weight: 900;
+}
+
+.test-title {
+  flex: 1;
+}
+
+.test-title strong,
+.test-title span {
+  display: block;
+}
+
+.test-title strong {
+  font-size: 13px;
+}
+
+.test-title span {
+  color: #716a78;
   font-size: 9px;
   margin-top: 3px;
 }
 
-.at-system > b {
-  color: #77707f;
-  font-size: 8px;
-}
-
-.at-system > b.ready {
-  color: #9ee6b4;
-}
-
-.at-check {
-  width: 100%;
-  margin-top: 13px;
-  background:
-    rgba(201,167,255,.07);
-  border:
-    1px solid rgba(201,167,255,.16);
-  color: #c9a7ff;
-}
-
-.at-preview {
-  height: 175px;
-  margin-top: 14px;
-  border-radius: 15px;
-  overflow: hidden;
-  position: relative;
-  background: #020204;
-}
-
-.at-preview video,
-.at-video video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
-}
-
-.at-preview span,
-.at-video > span {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  padding: 5px 7px;
-  border-radius: 6px;
-  background:
-    rgba(0,0,0,.65);
-  font-size: 7px;
-  font-weight: 900;
-  letter-spacing: 1px;
-}
-
-.at-stats,
-.at-summary {
-  display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
-  gap: 9px;
-  margin: 12px 0;
-}
-
-.at-stat {
-  padding: 14px 8px;
-  border-radius: 14px;
-  background:
-    rgba(255,255,255,.025);
-  border:
-    1px solid rgba(255,255,255,.055);
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.at-stat strong {
-  font-size: 18px;
-}
-
-.at-stat span {
-  color: #706a77;
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: 1px;
-}
-
-.at-start {
-  width: 100%;
-  border: 0;
-  background:
-    linear-gradient(
-      135deg,
-      #d8c2ff,
-      #b38bf1
-    );
-  color: #160c1e;
-  padding: 0 18px;
+.header-right {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.at-start.disabled {
-  background:
-    rgba(255,255,255,.06);
-  color: #5f5965;
-  cursor: not-allowed;
-}
-
-.at-link {
-  display: block;
-  margin: 12px auto 0;
-  background: transparent;
-  border: 0;
-  color: #696270;
-}
-
-.at-inline-error {
-  margin-top: 10px;
-  padding: 10px;
-  border-radius: 10px;
-  background:
-    rgba(255,80,100,.06);
-  border:
-    1px solid rgba(255,80,100,.12);
-  color: #ff9aa7;
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.at-running {
-  display: flex;
-  flex-direction: column;
-}
-
-.at-top {
-  height: 76px;
-  display: flex;
-  align-items: center;
-  gap: 25px;
-  padding: 0 24px;
-  background:
-    rgba(10,9,15,.97);
-  border-bottom:
-    1px solid rgba(255,255,255,.07);
-}
-
-.at-brand {
-  display: flex;
   gap: 10px;
-  align-items: center;
-  min-width: 175px;
 }
 
-.at-brand > b {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background:
-    linear-gradient(
-      135deg,
-      #d9c1ff,
-      #a77be9
-    );
-  color: #170d20;
-  display: grid;
-  place-items: center;
-  font-weight: 950;
-}
-
-.at-brand strong,
-.at-brand small {
-  display: block;
-}
-
-.at-brand strong {
-  font-size: 12px;
-  letter-spacing: 1px;
-}
-
-.at-brand small {
-  margin-top: 2px;
-  color: #716b78;
-  font-size: 7px;
-  letter-spacing: 1.5px;
-  font-weight: 800;
-}
-
-.at-identity {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.at-identity strong {
-  font-size: 13px;
-}
-
-.at-identity span {
-  color: #716b78;
-  font-size: 9px;
-}
-
-.at-top-right {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.at-timer {
-  min-width: 105px;
-  padding: 8px 12px;
+.timer {
+  min-width: 115px;
+  padding: 8px 13px;
   border-radius: 12px;
-  background:
-    rgba(201,167,255,.07);
   border:
     1px solid rgba(201,167,255,.13);
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: #d5bfff;
-}
-
-.at-timer.danger {
-  color: #ff8797;
   background:
-    rgba(255,80,100,.1);
-  border-color:
-    rgba(255,80,100,.25);
+    rgba(201,167,255,.06);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #d7c1fa;
 }
 
-.at-timer small {
+.timer small {
   color: #716a78;
   font-size: 7px;
   letter-spacing: 1px;
 }
 
-.at-live {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background:
-    rgba(130,220,160,.05);
-  color: #91dba8;
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.timer strong {
+  font-size: 17px;
 }
 
-.at-progress {
+.timer.danger {
+  color: #ff8999;
+  border-color:
+    rgba(255,80,100,.25);
+  background:
+    rgba(255,80,100,.08);
+}
+
+.question-progress {
+  padding: 11px 14px;
+  border-radius: 12px;
+  color: #aaa2af;
+  background:
+    rgba(255,255,255,.035);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.progress-line {
   height: 3px;
   background:
     rgba(255,255,255,.05);
 }
 
-.at-progress span {
+.progress-line span {
   display: block;
   height: 100%;
   background:
     linear-gradient(
       90deg,
-      #a77be9,
-      #d6c0ff
+      #a87ce7,
+      #dccaff
     );
-  transition:
-    width .2s;
+  transition: width .2s ease;
 }
 
-.at-layout {
+.test-layout {
   flex: 1;
-  display: grid;
-  grid-template-columns:
-    235px
-    minmax(0,1fr)
-    265px;
   min-height:
     calc(100vh - 79px);
+  display: grid;
+  grid-template-columns:
+    245px
+    minmax(0, 1fr);
 }
 
-.at-question-nav,
-.at-proctor {
-  background:
-    rgba(255,255,255,.012);
-}
-
-.at-question-nav {
+.question-sidebar {
+  padding: 20px;
   border-right:
     1px solid rgba(255,255,255,.06);
-  padding: 20px;
+  background:
+    rgba(255,255,255,.012);
   display: flex;
   flex-direction: column;
 }
 
-.at-proctor {
-  border-left:
-    1px solid rgba(255,255,255,.06);
-  padding: 18px;
-}
-
-.at-nav-head {
+.sidebar-heading {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 17px;
 }
 
-.at-nav-head strong {
-  color: #827a8a;
+.sidebar-heading strong {
+  color: #817a89;
   font-size: 9px;
   letter-spacing: 1.7px;
 }
 
-.at-nav-head span {
+.sidebar-heading span {
   color: #c9a7ff;
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 950;
 }
 
-.at-question-grid {
+.question-grid {
   display: grid;
   grid-template-columns:
-    repeat(4,1fr);
+    repeat(4, 1fr);
   gap: 7px;
 }
 
-.at-question-grid button {
+.question-grid button {
   aspect-ratio: 1;
   border-radius: 10px;
+  cursor: pointer;
   border:
     1px solid rgba(255,255,255,.07);
   background:
     rgba(255,255,255,.025);
-  color: #77707f;
+  color: #77717f;
   font-size: 9px;
-  font-weight: 900;
-  cursor: pointer;
+  font-weight: 950;
 }
 
-.at-question-grid button.current {
-  background:
-    rgba(201,167,255,.15);
+.question-grid button.current {
   border-color:
     rgba(201,167,255,.45);
-  color: #e0cfff;
+  background:
+    rgba(201,167,255,.14);
+  color: #dfcfff;
 }
 
-.at-question-grid button.answered {
+.question-grid button.answered {
+  border-color:
+    rgba(120,215,150,.22);
   background:
     rgba(120,215,150,.07);
-  border-color:
-    rgba(120,215,150,.2);
   color: #91dba8;
 }
 
-.at-legend {
+.question-grid button.current.answered {
+  border-color:
+    rgba(201,167,255,.45);
+  background:
+    rgba(201,167,255,.14);
+  color: #dfcfff;
+}
+
+.sidebar-legend {
   margin-top: 20px;
   padding-top: 17px;
   border-top:
@@ -3403,80 +3094,97 @@ button {
   gap: 9px;
 }
 
-.at-legend-item {
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #6d6674;
   font-size: 9px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
 
-.at-legend-item i {
+.legend i {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: #45404b;
 }
 
-.at-legend-item i.current {
+.legend i.current {
   background: #c9a7ff;
 }
 
-.at-legend-item i.answered {
+.legend i.answered {
   background: #80d69a;
 }
 
-.at-nav-footer {
+.sidebar-summary {
   margin-top: auto;
-  padding: 12px;
-  border-radius: 13px;
+  padding: 15px;
+  border-radius: 14px;
   background:
-    rgba(120,215,150,.035);
+    rgba(201,167,255,.035);
   border:
-    1px solid rgba(120,215,150,.09);
-  display: flex;
-  gap: 9px;
-  align-items: center;
+    1px solid rgba(201,167,255,.07);
 }
 
-.at-nav-footer strong,
-.at-nav-footer span {
-  display: block;
-}
-
-.at-nav-footer strong {
+.sidebar-summary > span {
+  color: #716a78;
   font-size: 8px;
-}
-
-.at-nav-footer span {
-  color: #6d6674;
-  font-size: 7px;
-  margin-top: 3px;
-}
-
-.at-question-area {
-  padding: 38px
-    clamp(25px,5vw,70px);
-  display: flex;
-  flex-direction: column;
-  overflow: auto;
-}
-
-.at-q-head {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 22px;
-}
-
-.at-q-head span {
-  display: block;
-  color: #8b8295;
-  font-size: 9px;
-  letter-spacing: 1.7px;
+  letter-spacing: 1px;
   font-weight: 900;
 }
 
-.at-q-head b {
+.sidebar-summary strong {
+  display: block;
+  margin: 7px 0;
+  font-size: 24px;
+}
+
+.sidebar-summary > div {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 20px;
+  background:
+    rgba(255,255,255,.06);
+}
+
+.sidebar-summary i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      #a87ce7,
+      #dccaff
+    );
+}
+
+.question-section {
+  padding:
+    38px
+    clamp(25px, 5vw, 75px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.question-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.question-top > div > span {
+  display: block;
+  color: #89818f;
+  font-size: 9px;
+  letter-spacing: 1.7px;
+  font-weight: 950;
+}
+
+.question-top b {
   display: inline-block;
   margin-top: 8px;
   padding: 6px 9px;
@@ -3487,7 +3195,7 @@ button {
   font-size: 8px;
 }
 
-.at-q-head em {
+.question-top em {
   padding: 7px 10px;
   border:
     1px solid rgba(255,255,255,.07);
@@ -3498,11 +3206,11 @@ button {
   font-weight: 900;
 }
 
-.at-question-card {
+.question-card {
   flex: 1;
   padding:
-    clamp(25px,4vw,50px);
-  border-radius: 25px;
+    clamp(25px, 4vw, 55px);
+  border-radius: 26px;
   background:
     linear-gradient(
       135deg,
@@ -3513,47 +3221,53 @@ button {
     1px solid rgba(255,255,255,.075);
 }
 
-.at-q-number {
-  color: #9e88bb;
+.question-number {
+  color: #a88bc8;
   font-size: 11px;
-  font-weight: 900;
   letter-spacing: 2px;
-  margin-bottom: 17px;
+  font-weight: 950;
+  margin-bottom: 18px;
 }
 
-.at-question-card h1 {
+.question-card h1 {
+  max-width: 1000px;
   margin: 0;
-  max-width: 900px;
   font-size:
-    clamp(22px,3vw,32px);
-  line-height: 1.35;
+    clamp(23px, 3vw, 34px);
+  line-height: 1.4;
+  letter-spacing: -.5px;
 }
 
-.at-options {
+.options {
   margin-top: 34px;
   display: flex;
   flex-direction: column;
   gap: 11px;
 }
 
-.at-options button {
+.options button {
   width: 100%;
-  min-height: 64px;
-  padding: 9px 15px;
+  min-height: 66px;
   border-radius: 15px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
   border:
     1px solid rgba(255,255,255,.07);
   background:
     rgba(255,255,255,.025);
   color: #c4becb;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  text-align: left;
-  cursor: pointer;
 }
 
-.at-options button.selected {
+.options button:hover {
+  background:
+    rgba(255,255,255,.05);
+}
+
+.options button.selected {
   border-color:
     rgba(201,167,255,.45);
   background:
@@ -3561,359 +3275,719 @@ button {
   color: #fff;
 }
 
-.at-options button > b {
-  width: 35px;
-  height: 35px;
+.options button > b {
+  width: 37px;
+  height: 37px;
   border-radius: 10px;
-  background:
-    rgba(255,255,255,.045);
+  flex-shrink: 0;
   display: grid;
   place-items: center;
+  background:
+    rgba(255,255,255,.045);
   color: #837b8d;
-  flex-shrink: 0;
 }
 
-.at-options button.selected > b {
+.options button.selected > b {
+  color: #decaff;
   background:
     rgba(201,167,255,.16);
-  color: #d9c4ff;
 }
 
-.at-options button span {
+.options button > span {
   flex: 1;
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
-.at-options button i {
+.options button > i {
   color: #c9a7ff;
+  font-size: 18px;
   font-style: normal;
   font-weight: 950;
-  font-size: 18px;
 }
 
-.at-q-actions {
-  margin-top: 18px;
+.question-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  margin-top: 18px;
 }
 
-.at-prev,
-.at-next,
-.at-finish {
-  min-height: 45px;
+.previous-button,
+.next-button,
+.finish-button {
+  min-height: 46px;
+  padding: 0 17px;
   border-radius: 12px;
-  padding: 0 16px;
+  cursor: pointer;
   font-size: 9px;
   font-weight: 950;
-  cursor: pointer;
+  letter-spacing: 1px;
 }
 
-.at-prev {
+.previous-button {
+  color: #b0a9b6;
   border:
     1px solid rgba(255,255,255,.07);
   background:
     rgba(255,255,255,.035);
-  color: #b0a9b6;
 }
 
-.at-prev:disabled {
+.previous-button:disabled {
   opacity: .3;
   cursor: not-allowed;
 }
 
-.at-next {
+.next-button {
   border: 0;
+  color: #170d20;
   background:
     linear-gradient(
       135deg,
-      #d6bfff,
-      #b48bf0
+      #dccaff,
+      #a97de8
     );
-  color: #170d20;
 }
 
-.at-finish {
+.finish-button {
   border: 0;
+  color: #0b1b10;
   background:
     linear-gradient(
       135deg,
       #9ee6b4,
-      #6ecf8c
+      #69cf8a
     );
-  color: #0b1b10;
 }
 
-.at-answer-state {
+.answer-state {
   color: #77707e;
   font-size: 9px;
-  font-weight: 800;
-}
-
-.at-camera {
-  padding: 13px;
-  border-radius: 18px;
-  background:
-    rgba(255,255,255,.035);
-  border:
-    1px solid rgba(255,255,255,.075);
-}
-
-.at-camera-head {
-  display: flex;
-  justify-content: space-between;
-  padding:
-    3px 4px 12px;
-}
-
-.at-camera-head strong,
-.at-camera-head span {
-  display: block;
-}
-
-.at-camera-head strong {
-  color: #817989;
-  font-size: 8px;
-  letter-spacing: 1.3px;
-}
-
-.at-camera-head span {
-  color: #87d79c;
-  font-size: 7px;
   font-weight: 900;
-  margin-top: 4px;
 }
 
-.at-camera-head > b {
-  color: #ff7888;
-  font-size: 8px;
-}
-
-.at-video {
-  height: 190px;
-  position: relative;
-  border-radius: 13px;
-  overflow: hidden;
-  background: #020204;
-}
-
-.at-check-line {
-  display: grid;
-  grid-template-columns:
-    18px 1fr auto;
-  gap: 6px;
-  padding: 8px 0;
-  border-top:
-    1px solid rgba(255,255,255,.045);
-  font-size: 8px;
-  align-items: center;
-  color: #817b88;
-}
-
-.at-check-line span.ready {
-  color: #86d69b;
-}
-
-.at-check-line em {
-  color: #5c5662;
-  font-style: normal;
-  font-size: 7px;
-}
-
-.at-security {
-  margin-top: 12px;
-  padding: 13px;
-  border-radius: 16px;
-  background:
-    rgba(201,167,255,.035);
-  border:
-    1px solid rgba(201,167,255,.08);
-  display: flex;
-  gap: 10px;
-}
-
-.at-security > b {
-  color: #c9a7ff;
-  font-size: 18px;
-}
-
-.at-security strong {
-  font-size: 10px;
-}
-
-.at-security p {
-  margin: 4px 0 0;
-  color: #696270;
-  font-size: 8px;
-  line-height: 1.5;
-}
-
-.at-modal-backdrop {
+.modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background:
-    rgba(0,0,0,.78);
-  backdrop-filter:
-    blur(14px);
   display: grid;
   place-items: center;
   padding: 20px;
+  background:
+    rgba(0,0,0,.78);
+  backdrop-filter:
+    blur(15px);
 }
 
-.at-modal {
-  width: min(520px,100%);
-  padding: 32px;
+.submit-modal {
+  width:
+    min(540px, 100%);
+  padding: 34px;
   border-radius: 26px;
+  border:
+    1px solid rgba(255,255,255,.1);
   background:
     linear-gradient(
       145deg,
-      #16121d,
+      #17131e,
       #0d0b11
     );
-  border:
-    1px solid rgba(255,255,255,.1);
   box-shadow:
-    0 30px 100px rgba(0,0,0,.5);
+    0 35px 100px
+    rgba(0,0,0,.5);
 }
 
-.at-modal-icon {
-  width: 48px;
-  height: 48px;
+.modal-icon {
+  width: 50px;
+  height: 50px;
   border-radius: 15px;
-  background:
-    rgba(201,167,255,.1);
-  color: #c9a7ff;
   display: grid;
   place-items: center;
-  font-weight: 900;
+  color: #c9a7ff;
+  background:
+    rgba(201,167,255,.1);
   font-size: 20px;
+  font-weight: 950;
   margin-bottom: 18px;
 }
 
-.at-modal h2 {
-  margin: 8px 0;
-  font-size: 25px;
+.submit-modal h2 {
+  margin: 9px 0;
+  font-size: 28px;
 }
 
-.at-modal p {
+.submit-modal p {
   color: #85808d;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
-button:not(:disabled):hover {
-  filter: brightness(1.08);
+.modal-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(3, 1fr);
+  gap: 8px;
+  margin: 20px 0;
 }
 
-button:not(:disabled):active {
-  transform: translateY(1px);
+.modal-actions {
+  display: grid;
+  grid-template-columns:
+    1fr 1fr;
+  gap: 10px;
 }
 
-@media (max-width: 1100px) {
-  .at-layout {
-    grid-template-columns:
-      190px minmax(0,1fr);
-  }
-
-  .at-proctor {
-    display: none;
-  }
+.submit-error {
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 10px;
+  color: #ff9aa7;
+  background:
+    rgba(255,80,100,.06);
+  border:
+    1px solid rgba(255,80,100,.12);
+  font-size: 10px;
+  line-height: 1.5;
 }
 
-@media (max-width: 850px) {
-  .at-pre-grid {
+@media (max-width: 900px) {
+  .ready-grid {
     grid-template-columns: 1fr;
   }
 
-  .at-pre-head {
-    flex-direction: column;
+  .start-card {
+    position: static;
   }
 
-  .at-top {
-    gap: 10px;
+  .test-layout {
+    grid-template-columns:
+      190px
+      minmax(0, 1fr);
   }
 
-  .at-brand {
+  .test-title {
+    display: none;
+  }
+
+  .brand {
     min-width: auto;
   }
-
-  .at-identity {
-    display: none;
-  }
-
-  .at-top-right {
-    margin-left: auto;
-  }
-
-  .at-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .at-question-nav {
-    display: none;
-  }
-
-  .at-question-area {
-    padding:
-      25px 18px;
-  }
-
-  .at-q-actions {
-    flex-wrap: wrap;
-  }
-
-  .at-answer-state {
-    order: 3;
-    width: 100%;
-    text-align: center;
-  }
-
-  .at-actions,
-  .at-modal-actions {
-    grid-template-columns: 1fr;
-  }
 }
 
-@media (max-width: 520px) {
-  .at-pre {
+@media (max-width: 700px) {
+  .ready-page {
     width:
-      min(
-        calc(100% - 28px),
-        1250px
-      );
+      calc(100% - 28px);
     padding-top: 30px;
   }
 
-  .at-pre-head h1 {
-    font-size: 34px;
+  .ready-header {
+    flex-direction: column;
   }
 
-  .at-top {
-    height: 68px;
+  .ready-header h1 {
+    font-size: 38px;
+  }
+
+  .error-actions,
+  .modal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .test-header {
     padding: 0 12px;
   }
 
-  .at-top-right .at-live {
+  .header-right {
+    margin-left: auto;
+  }
+
+  .question-progress {
     display: none;
   }
 
-  .at-timer {
-    min-width: 90px;
+  .test-layout {
+    grid-template-columns: 1fr;
   }
 
-  .at-question-card {
+  .question-sidebar {
+    display: none;
+  }
+
+  .question-section {
+    padding:
+      25px 15px;
+  }
+
+  .question-card {
     padding: 22px;
   }
 
-  .at-question-card h1 {
+  .question-card h1 {
     font-size: 22px;
   }
 
-  .at-options button {
-    min-height: 58px;
+  .question-actions {
+    flex-wrap: wrap;
+  }
+
+  .answer-state {
+    width: 100%;
+    text-align: center;
+    order: 3;
+  }
+}
+
+@media (max-width: 480px) {
+  .timer {
+    min-width: 92px;
+  }
+
+  .timer small {
+    display: none;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand strong {
+    font-size: 10px;
+  }
+
+  .options button {
+    min-height: 60px;
+  }
+
+  .options button > span {
+    font-size: 13px;
+  }
+
+  .modal-stats {
+    grid-template-columns: 1fr;
+  }
+}
+`;
+
+/* =========================================================
+   RESULT CSS
+========================================================= */
+
+const RESULT_CSS = `
+* {
+  box-sizing: border-box;
+}
+
+.result-screen {
+  min-height: 100vh;
+  color: #f8f5fb;
+  background:
+    radial-gradient(
+      circle at 80% 0%,
+      rgba(160,110,255,.14),
+      transparent 34%
+    ),
+    #07060b;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  padding: 45px 20px 70px;
+}
+
+.result-container {
+  width:
+    min(1100px, 100%);
+  margin: auto;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 25px;
+  margin-bottom: 30px;
+}
+
+.result-header h1 {
+  margin: 9px 0 6px;
+  font-size:
+    clamp(38px, 5vw, 62px);
+  line-height: 1;
+  letter-spacing: -2px;
+}
+
+.result-header p {
+  margin: 0;
+  color: #817a88;
+  font-size: 13px;
+}
+
+.completed-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: 13px;
+  border:
+    1px solid rgba(120,215,150,.17);
+  background:
+    rgba(120,215,150,.04);
+  color: #91dba8;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 1px;
+}
+
+.completed-badge span {
+  font-size: 14px;
+}
+
+.score-hero {
+  min-height: 270px;
+  padding: 35px;
+  border-radius: 28px;
+  border:
+    1px solid rgba(255,255,255,.08);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,.05),
+      rgba(255,255,255,.018)
+    );
+  display: flex;
+  align-items: center;
+  gap: 50px;
+}
+
+.score-circle {
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(
+      circle,
+      #110d16 62%,
+      transparent 63%
+    ),
+    conic-gradient(
+      #c9a7ff 0deg,
+      #a67ae5 280deg,
+      rgba(255,255,255,.06) 280deg
+    );
+}
+
+.score-circle > div {
+  display: flex;
+  align-items: baseline;
+}
+
+.score-circle strong {
+  font-size: 55px;
+  letter-spacing: -3px;
+}
+
+.score-circle span {
+  color: #77707e;
+  font-size: 13px;
+}
+
+.score-copy > span {
+  color: #817989;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 1.8px;
+}
+
+.score-copy h2 {
+  margin: 9px 0;
+  font-size: 32px;
+}
+
+.score-copy p {
+  margin: 0;
+  color: #89828f;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.score-copy p strong {
+  color: #ddd5e2;
+}
+
+.score-copy small {
+  display: block;
+  margin-top: 14px;
+  color: #6e6875;
+  font-size: 10px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns:
+    repeat(4, 1fr);
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.metric {
+  padding: 20px;
+  border-radius: 17px;
+  border:
+    1px solid rgba(255,255,255,.06);
+  background:
+    rgba(255,255,255,.025);
+}
+
+.metric span,
+.metric strong {
+  display: block;
+}
+
+.metric span {
+  color: #706a78;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 1.4px;
+}
+
+.metric strong {
+  margin-top: 7px;
+  font-size: 25px;
+}
+
+.analysis-panel {
+  padding: 27px;
+  border-radius: 24px;
+  border:
+    1px solid rgba(255,255,255,.07);
+  background:
+    rgba(255,255,255,.025);
+}
+
+.analysis-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 23px;
+}
+
+.analysis-heading span {
+  color: #817989;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 1.7px;
+}
+
+.analysis-heading h2 {
+  margin: 8px 0 0;
+  font-size: 22px;
+}
+
+.analysis-heading small {
+  color: #6c6673;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 1px;
+}
+
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.breakdown-row {
+  padding-bottom: 20px;
+  border-bottom:
+    1px solid rgba(255,255,255,.05);
+}
+
+.breakdown-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.breakdown-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.breakdown-title span {
+  color: #c4beca;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.breakdown-title strong {
+  color: #c9a7ff;
+  font-size: 13px;
+}
+
+.breakdown-track {
+  height: 8px;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    rgba(255,255,255,.06);
+}
+
+.breakdown-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      #a87ce7,
+      #dccaff
+    );
+}
+
+.breakdown-meta {
+  color: #66606c;
+  font-size: 9px;
+  margin-top: 7px;
+}
+
+.empty-analysis {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: #6e6875;
+}
+
+.empty-analysis div {
+  font-size: 35px;
+}
+
+.empty-analysis p {
+  font-size: 11px;
+}
+
+.result-note {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 13px;
+  padding: 15px;
+  border-radius: 14px;
+  border:
+    1px solid rgba(201,167,255,.08);
+  background:
+    rgba(201,167,255,.025);
+}
+
+.result-note > div {
+  width: 29px;
+  height: 29px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: #c9a7ff;
+  background:
+    rgba(201,167,255,.08);
+}
+
+.result-note p {
+  margin: 0;
+  color: #716b78;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.result-actions {
+  display: grid;
+  grid-template-columns:
+    1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.result-primary,
+.result-secondary {
+  min-height: 53px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 1px;
+}
+
+.result-primary {
+  border: 0;
+  color: #170d20;
+  background:
+    linear-gradient(
+      135deg,
+      #dccaff,
+      #a97de8
+    );
+}
+
+.result-secondary {
+  color: #b7afbc;
+  border:
+    1px solid rgba(255,255,255,.08);
+  background:
+    rgba(255,255,255,.035);
+}
+
+@media (max-width: 750px) {
+  .result-screen {
+    padding:
+      30px 14px 50px;
+  }
+
+  .result-header {
+    flex-direction: column;
+  }
+
+  .score-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 25px;
+    padding: 25px;
+  }
+
+  .score-circle {
+    width: 155px;
+    height: 155px;
+  }
+
+  .score-circle strong {
+    font-size: 45px;
+  }
+
+  .metrics {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+  .result-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 450px) {
+  .metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .analysis-panel {
+    padding: 20px;
   }
 }
 `;

@@ -11,7 +11,8 @@ import Profile from "./screens/Profile";
 import Companies from "./screens/Companies";
 import CompanyDetails from "./screens/CompanyDetails";
 import RolePreparation from "./screens/RolePreparation";
-import Roles from "./screens/Roles";
+
+
 
 import Practice from "./screens/Practice";
 import Assessments from "./screens/Assessments";
@@ -61,8 +62,7 @@ export default function App() {
   element={<RolePreparation />}
 />
 
-        {/* ROLES */}
-        <Route path="/roles" element={<Roles />} />
+  
 
         {/* PRACTICE */}
         <Route path="/practice" element={<Practice />} />
