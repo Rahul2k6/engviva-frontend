@@ -78,9 +78,14 @@ export default function App() {
           path="/practice/coding"
           element={<CodingLab />}
         />
+       <Route
+        path="/technical-lab"
+        element={<TechnicalLab />}
+        />
+
         <Route
-          path="/practice/technical"
-          element={<TechnicalLab />}
+         path="/technical-lab/:companyId/levels"
+        element={<TechnicalLab />}
         />
 
         {/* INTERVIEWS */}

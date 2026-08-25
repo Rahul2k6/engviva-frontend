@@ -1408,7 +1408,7 @@ export default function CompanyDetails() {
 
           case "technical":
             navigate(
-              `/technical-lab?company=${company}&role=${role}`
+              `/technical-lab?company=${companyId}&role=${role}`
             );
             break;
 
