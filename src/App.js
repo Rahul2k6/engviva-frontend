@@ -17,6 +17,7 @@ import RolePreparation from "./screens/RolePreparation";
 import Practice from "./screens/Practice";
 import Assessments from "./screens/Assessments";
 import AssessmentTest from "./screens/AssessmentTest";
+import TechnicalAssessment from "./screens/TechnicalAssessment";
 import CodingLab from "./screens/CodingLab";
 import TechnicalLab from "./screens/TechnicalLab";
 
@@ -74,6 +75,29 @@ export default function App() {
          path="/practice/assessments/test"
         element={<AssessmentTest />}
         />
+
+        <Route
+         path="/technical-lab"
+        element={
+         <TechnicalAssessment />
+             }
+          />
+
+        <Route
+          path="/technical-lab/:companyId"
+          element={
+            <TechnicalAssessment />
+          }
+        />
+
+                  <Route
+            path="/technical-lab/:companyId/level/:levelNumber"
+            element={
+              <TechnicalAssessment />
+            }
+          />
+
+
         <Route
           path="/practice/coding"
           element={<CodingLab />}
