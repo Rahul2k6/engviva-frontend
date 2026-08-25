@@ -994,16 +994,21 @@ export default function TechnicalLab() {
    *
    * Step 5 will consume this route.
    */
-
-  function openLevels() {
-    navigate(
-      `/technical-lab/${encodeURIComponent(
-        companyId
-      )}/levels?role=${encodeURIComponent(
-        roleFromUrl
-      )}`
-    );
-  }
+function openLevels() {
+  navigate(
+    `/technical-lab/${encodeURIComponent(
+      companyId
+    )}?role=${encodeURIComponent(
+      roleFromUrl
+    )}`,
+    {
+      state: {
+        companyId,
+        role: roleFromUrl,
+      },
+    }
+  );
+}
 
   /*
    * Keep a safe fallback route if
@@ -1011,18 +1016,9 @@ export default function TechnicalLab() {
    *
    * We don't start the assessment here.
    */
-
-  function handleBack() {
-    if (
-      window.history.length >
-      1
-    ) {
-      navigate(-1);
-      return;
-    }
-
-    navigate("/");
-  }
+function handleBack() {
+  navigate("/dashboard");
+}
 
   /*
    * Loading.
