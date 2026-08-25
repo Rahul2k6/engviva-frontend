@@ -995,10 +995,14 @@ export default function TechnicalLab() {
    * Step 5 will consume this route.
    */
 function openLevels() {
+  if (!companyId) {
+    return;
+  }
+
   navigate(
     `/technical-lab/${encodeURIComponent(
       companyId
-    )}?role=${encodeURIComponent(
+    )}/levels?role=${encodeURIComponent(
       roleFromUrl
     )}`,
     {

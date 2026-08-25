@@ -9,6 +9,7 @@ import React, {
 import {
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router-dom";
 
 const API_BASE =
@@ -443,6 +444,14 @@ function normalizeQuestions(
     );
 }
 
+function normalizeCompanyId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function getCompany(
   companyId
 ) {
@@ -540,6 +549,11 @@ export default function TechnicalAssessment() {
   const location =
     useLocation();
 
+  const {
+    companyId: pathCompanyId,
+    levelNumber: pathLevelNumber,
+  } = useParams();
+
   const params =
     useMemo(
       () =>
@@ -549,16 +563,34 @@ export default function TechnicalAssessment() {
       [location.search]
     );
 
+  // Support ALL ENGVIVA Technical Lab URLs:
+  // /technical-lab?company=google
+  // /technical-lab/google
+  // /technical-lab/google/levels
+  // and router state.
+  const pathnameParts =
+    location.pathname
+      .split("/")
+      .filter(Boolean);
+
   const routeCompany =
-    firstValue(
-      location.state?.companyId,
-      location.state?.company?.id,
-      params.get("company")
+    normalizeCompanyId(
+      firstValue(
+        pathCompanyId,
+        location.state?.companyId,
+        location.state?.company?.id,
+        params.get("company"),
+        params.get("companyId"),
+        pathnameParts[1] === "technical-lab"
+          ? pathnameParts[2]
+          : null
+      )
     );
 
   const routeLevel =
     safeNumber(
       firstValue(
+        pathLevelNumber,
         location.state?.levelNumber,
         params.get("level")
       ),
@@ -747,19 +779,51 @@ export default function TechnicalAssessment() {
           }
 
           const data =
-            payload?.data ||
+            payload?.data ??
             payload;
 
+          // The backend has used more than one envelope while
+          // this feature was being developed. Accept all valid
+          // envelopes without inventing frontend question data.
           const nextLevels =
-            Array.isArray(
-              data?.levels
-            )
+            Array.isArray(data)
+              ? data
+              : Array.isArray(data?.levels)
               ? data.levels
-              : Array.isArray(
-                  payload?.levels
-                )
+              : Array.isArray(data?.items)
+              ? data.items
+              : Array.isArray(data?.data)
+              ? data.data
+              : Array.isArray(payload?.levels)
               ? payload.levels
+              : Array.isArray(payload?.items)
+              ? payload.items
               : [];
+
+          console.log(
+            "[TECHNICAL LEVELS] Response:",
+            payload
+          );
+
+          console.log(
+            "[TECHNICAL LEVELS] Parsed level count:",
+            nextLevels.length
+          );
+
+          if (!nextLevels.length) {
+            const backendMessage =
+              firstValue(
+                payload?.error,
+                payload?.message,
+                data?.error,
+                data?.message
+              );
+
+            throw new Error(
+              backendMessage ||
+                `No technical levels are configured for ${getCompany(companyId).name}.`
+            );
+          }
 
           setLevels(
             nextLevels
@@ -820,7 +884,9 @@ export default function TechnicalAssessment() {
         );
 
         navigate(
-          `/technical-lab/${company.id}`,
+          `/technical-lab/${encodeURIComponent(
+            company.id
+          )}/levels`,
           {
             replace: true,
             state: {
