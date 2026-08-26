@@ -995,27 +995,24 @@ export default function TechnicalLab() {
    * Step 5 will consume this route.
    */
 function openLevels() {
-  if (!companyId) {
+  const id = normalizeCompanyId(companyId);
+
+  if (!id) {
     setError("Please select a company first.");
     return;
   }
 
   navigate(
-    `/technical-lab/${encodeURIComponent(
-      companyId
-    )}/levels?role=${encodeURIComponent(
-      roleFromUrl
-    )}`,
+    `/technical-lab/${encodeURIComponent(id)}/levels`,
     {
+      replace: true,
       state: {
-        companyId,
+        companyId: id,
         role: roleFromUrl,
       },
     }
   );
-}
-
-  /*
+}  /*
    * Keep a safe fallback route if
    * your router doesn't use the path above.
    *

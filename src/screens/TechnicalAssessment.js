@@ -5,31 +5,115 @@ import React, {
   useRef,
   useState,
 } from "react";
+
 import {
   useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
 
-/* ============================================================
-   CONFIG
-============================================================ */
+/*
+|--------------------------------------------------------------------------
+| ENGVIVA TECHNICAL ASSESSMENT
+|--------------------------------------------------------------------------
+|
+| Canonical flow:
+|
+| /technical-lab
+|        ↓
+| company list
+|        ↓
+| /technical-lab/:companyId/levels
+|        ↓
+| /technical-lab/:companyId/level/:levelNumber
+|        ↓
+| proctored test
+|        ↓
+| /technical-lab/:companyId/level/:levelNumber/result
+|
+| IMPORTANT:
+| - Questions come from backend.
+| - Correct answers NEVER come from frontend.
+| - Score NEVER calculated by frontend.
+| - Backend calculates final score.
+| - Firebase token is sent to protected assessment routes.
+|--------------------------------------------------------------------------
+*/
 
 const API_BASE = (
   import.meta.env.VITE_API_URL ||
   "https://engviva-backend.onrender.com"
 ).replace(/\/+$/, "");
 
-const STORAGE_KEY = "engviva:technical:attempt";
-const RESULT_KEY = "engviva:technical:result";
+const MAX_PROCTOR_FLAGS = 3;
 
-const MAX_PROCTOR_FLAGS = 5;
+const ATTEMPT_STORAGE_KEY =
+  "engviva_technical_active_attempt";
 
-/*
-  These are ONLY fallback company metadata.
-  Questions, levels, scores and assessment data NEVER come
-  from this list.
-*/
+const RESULT_STORAGE_KEY =
+  "engviva_technical_result";
+
+/* =========================================================================
+   BASIC HELPERS
+========================================================================= */
+
+function safeString(value, fallback = "") {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return fallback;
+  }
+
+  const text = String(value).trim();
+
+  return text || fallback;
+}
+
+function safeNumber(value, fallback = 0) {
+  const number = Number(value);
+
+  return Number.isFinite(number)
+    ? number
+    : fallback;
+}
+
+function firstValue(...values) {
+  for (const value of values) {
+    if (
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== ""
+    ) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function normalizeId(value) {
+  return safeString(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function clamp(value, min = 0, max = 100) {
+  return Math.max(
+    min,
+    Math.min(
+      max,
+      safeNumber(value)
+    )
+  );
+}
+
+/* =========================================================================
+   COMPANY DATA
+========================================================================= */
+
 const FALLBACK_COMPANIES = [
   {
     id: "google",
@@ -50,22 +134,16 @@ const FALLBACK_COMPANIES = [
     domain: "amazon.com",
   },
   {
-    id: "apple",
-    name: "Apple",
-    category: "Technology",
-    domain: "apple.com",
-  },
-  {
     id: "meta",
     name: "Meta",
     category: "Technology",
     domain: "meta.com",
   },
   {
-    id: "nvidia",
-    name: "NVIDIA",
+    id: "apple",
+    name: "Apple",
     category: "Technology",
-    domain: "nvidia.com",
+    domain: "apple.com",
   },
   {
     id: "ibm",
@@ -79,515 +157,72 @@ const FALLBACK_COMPANIES = [
     category: "Technology",
     domain: "oracle.com",
   },
-  {
-    id: "salesforce",
-    name: "Salesforce",
-    category: "Technology",
-    domain: "salesforce.com",
-  },
-  {
-    id: "adobe",
-    name: "Adobe",
-    category: "Technology",
-    domain: "adobe.com",
-  },
-  {
-    id: "cisco",
-    name: "Cisco",
-    category: "Technology",
-    domain: "cisco.com",
-  },
-  {
-    id: "intel",
-    name: "Intel",
-    category: "Technology",
-    domain: "intel.com",
-  },
-  {
-    id: "accenture",
-    name: "Accenture",
-    category: "Consulting",
-    domain: "accenture.com",
-  },
-  {
-    id: "deloitte",
-    name: "Deloitte",
-    category: "Consulting",
-    domain: "deloitte.com",
-  },
-  {
-    id: "tcs",
-    name: "TCS",
-    category: "IT Services",
-    domain: "tcs.com",
-  },
-  {
-    id: "infosys",
-    name: "Infosys",
-    category: "IT Services",
-    domain: "infosys.com",
-  },
-  {
-    id: "wipro",
-    name: "Wipro",
-    category: "IT Services",
-    domain: "wipro.com",
-  },
-  {
-    id: "hcltech",
-    name: "HCLTech",
-    category: "IT Services",
-    domain: "hcltech.com",
-  },
-  {
-    id: "tech-mahindra",
-    name: "Tech Mahindra",
-    category: "IT Services",
-    domain: "techmahindra.com",
-  },
-  {
-    id: "cognizant",
-    name: "Cognizant",
-    category: "IT Services",
-    domain: "cognizant.com",
-  },
-  {
-    id: "ltimindtree",
-    name: "LTIMindtree",
-    category: "IT Services",
-    domain: "ltimindtree.com",
-  },
-  {
-    id: "persistent",
-    name: "Persistent Systems",
-    category: "Technology",
-    domain: "persistent.com",
-  },
-  {
-    id: "zoho",
-    name: "Zoho",
-    category: "Technology",
-    domain: "zoho.com",
-  },
-  {
-    id: "freshworks",
-    name: "Freshworks",
-    category: "Technology",
-    domain: "freshworks.com",
-  },
-  {
-    id: "flipkart",
-    name: "Flipkart",
-    category: "Technology",
-    domain: "flipkart.com",
-  },
-  {
-    id: "phonepe",
-    name: "PhonePe",
-    category: "Fintech",
-    domain: "phonepe.com",
-  },
-  {
-    id: "razorpay",
-    name: "Razorpay",
-    category: "Fintech",
-    domain: "razorpay.com",
-  },
-  {
-    id: "swiggy",
-    name: "Swiggy",
-    category: "Technology",
-    domain: "swiggy.com",
-  },
-  {
-    id: "zomato",
-    name: "Zomato",
-    category: "Technology",
-    domain: "zomato.com",
-  },
-  {
-    id: "siemens",
-    name: "Siemens",
-    category: "Engineering",
-    domain: "siemens.com",
-  },
-  {
-    id: "bosch",
-    name: "Bosch",
-    category: "Engineering",
-    domain: "bosch.com",
-  },
-  {
-    id: "qualcomm",
-    name: "Qualcomm",
-    category: "Semiconductors",
-    domain: "qualcomm.com",
-  },
-  {
-    id: "amd",
-    name: "AMD",
-    category: "Semiconductors",
-    domain: "amd.com",
-  },
-  {
-    id: "pitti-engineering",
-    name: "Pitti Engineering",
-    category: "Engineering",
-    domain: "pitti.in",
-  },
 ];
 
-/* ============================================================
-   HELPERS
-============================================================ */
-
-function firstValue(...values) {
-  return values.find(
-    (value) =>
-      value !== undefined &&
-      value !== null &&
-      value !== ""
-  );
-}
-
-function safeNumber(value, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
-}
-
-function normalizeId(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function formatTime(seconds) {
-  const value = Math.max(
-    0,
-    Math.floor(safeNumber(seconds))
-  );
-
-  const minutes = Math.floor(value / 60);
-  const secs = value % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(
-    secs
-  ).padStart(2, "0")}`;
-}
-
-function getDomain(value) {
-  if (!value) return "";
-
-  try {
-    const url = String(value).startsWith("http")
-      ? String(value)
-      : `https://${String(value)}`;
-
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return String(value)
-      .replace(/^https?:\/\//, "")
-      .split("/")[0]
-      .replace(/^www\./, "");
-  }
-}
-
-/*
-  IMPORTANT:
-  Company logo is ALWAYS obtained through favicon service.
-  No Clearbit.
-  No manually supplied image URL.
-*/
-function getFavicon(domain) {
-  const cleanDomain = getDomain(domain);
-
-  if (!cleanDomain) return "";
-
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-    cleanDomain
-  )}&sz=256`;
-}
-
-function getFallbackCompany(id) {
-  const normalized = normalizeId(id);
+function getCompanyFromList(
+  companies,
+  id
+) {
+  const normalized =
+    normalizeId(id);
 
   return (
+    companies.find(
+      (company) =>
+        normalizeId(
+          company?.id
+        ) === normalized
+    ) ||
     FALLBACK_COMPANIES.find(
-      (company) => company.id === normalized
-    ) || {
-      id: normalized,
-      name: id || "Company",
-      category: "Engineering",
-      domain: "",
-    }
+      (company) =>
+        normalizeId(
+          company?.id
+        ) === normalized
+    ) ||
+    null
   );
 }
 
-function normalizeCompany(raw) {
-  const source = raw?.company || raw;
-
-  const id = normalizeId(
-    firstValue(
-      source?.id,
-      source?.companyId,
-      source?.slug
-    )
-  );
-
-  const fallback = getFallbackCompany(id);
-
-  const domain = getDomain(
-    firstValue(
-      source?.domain,
-      source?.website,
-      source?.websiteUrl,
-      source?.url,
-      fallback.domain
-    )
-  );
-
-  return {
-    id,
-    name: String(
-      firstValue(
-        source?.name,
-        source?.companyName,
-        fallback.name,
-        id
-      )
-    ),
-    category: String(
-      firstValue(
-        source?.category,
-        source?.industry,
-        fallback.category,
-        "Engineering"
-      )
-    ),
-    domain,
-  };
-}
-
-function normalizeQuestions(payload) {
-  const root = payload?.data ?? payload;
-
-  let source = [];
-
-  if (Array.isArray(root)) {
-    source = root;
-  } else if (Array.isArray(root?.questions)) {
-    source = root.questions;
-  } else if (Array.isArray(payload?.questions)) {
-    source = payload.questions;
-  }
-
-  return source
-    .map((question, index) => {
-      const options = Array.isArray(question?.options)
-        ? question.options
-            .map((option) => {
-              if (
-                option &&
-                typeof option === "object"
-              ) {
-                return String(
-                  firstValue(
-                    option.text,
-                    option.label,
-                    option.value,
-                    ""
-                  )
-                );
-              }
-
-              return String(option ?? "");
-            })
-            .filter(Boolean)
-        : [];
-
-      return {
-        id: String(
-          firstValue(
-            question?.id,
-            question?.questionId,
-            question?._id,
-            `technical-question-${index + 1}`
-          )
-        ),
-
-        question: String(
-          firstValue(
-            question?.question,
-            question?.text,
-            question?.questionText,
-            ""
-          )
-        ),
-
-        options,
-
-        module: String(
-          firstValue(
-            question?.module,
-            question?.moduleName,
-            question?.category,
-            "Technical"
-          )
-        ),
-
-        difficulty: String(
-          firstValue(
-            question?.difficulty,
-            question?.level,
-            "Mixed"
-          )
-        ),
-
-        images: Array.isArray(question?.images)
-          ? question.images
-          : [],
-      };
-    })
-    .filter(
-      (question) =>
-        question.question &&
-        question.options.length >= 2
-    );
-}
-
-/* ============================================================
-   FIREBASE AUTH
-============================================================ */
-
-async function getFirebaseToken() {
-  try {
-    const firebaseModule =
-      await import("../firebase");
-
-    const auth =
-      firebaseModule.auth ||
-      firebaseModule.default?.auth;
-
-    if (!auth?.currentUser) {
-      return null;
-    }
-
-    return await auth.currentUser.getIdToken();
-  } catch (error) {
-    console.warn(
-      "[TECHNICAL AUTH] Firebase token unavailable",
-      error
-    );
-
-    return null;
-  }
-}
-
-/* ============================================================
-   API
-============================================================ */
-
-async function apiFetch(path, options = {}) {
-  const token = await getFirebaseToken();
-
-  const headers = {
-    Accept: "application/json",
-    ...(options.body
-      ? {
-          "Content-Type": "application/json",
-        }
-      : {}),
-    ...(options.headers || {}),
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(
-    `${API_BASE}${path}`,
-    {
-      ...options,
-      headers,
-    }
-  );
-
-  const payload = await response
-    .json()
-    .catch(() => ({}));
-
-  if (!response.ok) {
-    const serverMessage =
-      payload?.error?.message ||
-      payload?.error ||
-      payload?.message;
-
-    if (response.status === 401) {
-      throw new Error(
-        serverMessage ||
-          "Please sign in before starting a technical assessment."
-      );
-    }
-
-    if (response.status === 404) {
-      const error = new Error(
-        serverMessage ||
-          "The requested technical resource was not found."
-      );
-
-      error.status = 404;
-
-      throw error;
-    }
-
-    const error = new Error(
-      serverMessage ||
-        `Request failed (${response.status}).`
-    );
-
-    error.status = response.status;
-
-    throw error;
-  }
-
-  return payload;
-}
-
-/* ============================================================
+/* =========================================================================
    STORAGE
-============================================================ */
+========================================================================= */
 
-function readAttempt() {
-  try {
-    return JSON.parse(
-      sessionStorage.getItem(STORAGE_KEY) || "null"
-    );
-  } catch {
-    return null;
-  }
-}
-
-function saveAttempt(attempt) {
+function saveAttempt(data) {
   try {
     sessionStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(attempt)
+      ATTEMPT_STORAGE_KEY,
+      JSON.stringify(data)
     );
   } catch {}
 }
 
+function readAttempt() {
+  try {
+    const value =
+      sessionStorage.getItem(
+        ATTEMPT_STORAGE_KEY
+      );
+
+    return value
+      ? JSON.parse(value)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function clearAttempt() {
   try {
-    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(
+      ATTEMPT_STORAGE_KEY
+    );
   } catch {}
 }
 
 function saveResult(result) {
   try {
     sessionStorage.setItem(
-      RESULT_KEY,
+      RESULT_STORAGE_KEY,
       JSON.stringify(result)
     );
   } catch {}
@@ -595,9 +230,14 @@ function saveResult(result) {
 
 function readResult() {
   try {
-    return JSON.parse(
-      sessionStorage.getItem(RESULT_KEY) || "null"
-    );
+    const value =
+      sessionStorage.getItem(
+        RESULT_STORAGE_KEY
+      );
+
+    return value
+      ? JSON.parse(value)
+      : null;
   } catch {
     return null;
   }
@@ -605,25 +245,599 @@ function readResult() {
 
 function clearResult() {
   try {
-    sessionStorage.removeItem(RESULT_KEY);
+    sessionStorage.removeItem(
+      RESULT_STORAGE_KEY
+    );
   } catch {}
 }
 
-/* ============================================================
+/* =========================================================================
+   FIREBASE AUTH
+========================================================================= */
+
+async function getFirebaseToken() {
+  try {
+    const firebase =
+      await import("../firebase");
+
+    const auth =
+      firebase.auth ||
+      firebase.default?.auth ||
+      null;
+
+    if (!auth?.currentUser) {
+      return null;
+    }
+
+    return await auth.currentUser.getIdToken();
+  } catch (error) {
+    console.error(
+      "[ENGVIVA TECHNICAL AUTH]",
+      error
+    );
+
+    return null;
+  }
+}
+
+/* =========================================================================
+   API
+========================================================================= */
+
+async function apiFetch(
+  endpoint,
+  options = {}
+) {
+  const token =
+    await getFirebaseToken();
+
+  const headers = {
+    Accept:
+      "application/json",
+
+    ...(options.body
+      ? {
+          "Content-Type":
+            "application/json",
+        }
+      : {}),
+
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    headers.Authorization =
+      `Bearer ${token}`;
+  }
+
+  const response =
+    await fetch(
+      `${API_BASE}${endpoint}`,
+      {
+        ...options,
+        headers,
+      }
+    );
+
+  const payload =
+    await response
+      .json()
+      .catch(() => ({}));
+
+  if (!response.ok) {
+    const message =
+      firstValue(
+        payload?.error?.message,
+        typeof payload?.error ===
+          "string"
+          ? payload.error
+          : "",
+        payload?.message,
+        `Request failed (${response.status}).`
+      );
+
+    const error =
+      new Error(message);
+
+    error.status =
+      response.status;
+
+    error.payload =
+      payload;
+
+    throw error;
+  }
+
+  return payload;
+}
+
+/* =========================================================================
+   MARKDOWN RENDERING
+========================================================================= */
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function renderInlineMarkdown(text) {
+  let value =
+    escapeHtml(text);
+
+  value =
+    value.replace(
+      /`([^`]+)`/g,
+      "<code>$1</code>"
+    );
+
+  value =
+    value.replace(
+      /\*\*([^*]+)\*\*/g,
+      "<strong>$1</strong>"
+    );
+
+  value =
+    value.replace(
+      /\*([^*]+)\*/g,
+      "<em>$1</em>"
+    );
+
+  value =
+    value.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+
+  return value;
+}
+
+function MarkdownText({
+  children,
+  className = "",
+}) {
+  const source =
+    safeString(children);
+
+  if (!source) {
+    return null;
+  }
+
+  const lines =
+    source.replace(
+      /\r\n/g,
+      "\n"
+    ).split("\n");
+
+  const output = [];
+
+  let listItems = [];
+
+  const flushList = () => {
+    if (!listItems.length) {
+      return;
+    }
+
+    output.push(
+      <ul
+        key={`list-${output.length}`}
+      >
+        {listItems.map(
+          (item, index) => (
+            <li
+              key={index}
+              dangerouslySetInnerHTML={{
+                __html:
+                  renderInlineMarkdown(
+                    item
+                  ),
+              }}
+            />
+          )
+        )}
+      </ul>
+    );
+
+    listItems = [];
+  };
+
+  lines.forEach(
+    (rawLine, index) => {
+      const line =
+        rawLine.trim();
+
+      if (!line) {
+        flushList();
+
+        output.push(
+          <div
+            key={`space-${index}`}
+            className="md-space"
+          />
+        );
+
+        return;
+      }
+
+      if (
+        /^[-*]\s+/.test(line)
+      ) {
+        listItems.push(
+          line.replace(
+            /^[-*]\s+/,
+            ""
+          )
+        );
+
+        return;
+      }
+
+      if (
+        /^\d+\.\s+/.test(line)
+      ) {
+        listItems.push(
+          line.replace(
+            /^\d+\.\s+/,
+            ""
+          )
+        );
+
+        return;
+      }
+
+      flushList();
+
+      if (
+        /^###\s+/.test(line)
+      ) {
+        output.push(
+          <h4
+            key={index}
+            dangerouslySetInnerHTML={{
+              __html:
+                renderInlineMarkdown(
+                  line.replace(
+                    /^###\s+/,
+                    ""
+                  )
+                ),
+            }}
+          />
+        );
+
+        return;
+      }
+
+      if (
+        /^##\s+/.test(line)
+      ) {
+        output.push(
+          <h3
+            key={index}
+            dangerouslySetInnerHTML={{
+              __html:
+                renderInlineMarkdown(
+                  line.replace(
+                    /^##\s+/,
+                    ""
+                  )
+                ),
+            }}
+          />
+        );
+
+        return;
+      }
+
+      if (
+        /^#\s+/.test(line)
+      ) {
+        output.push(
+          <h2
+            key={index}
+            dangerouslySetInnerHTML={{
+              __html:
+                renderInlineMarkdown(
+                  line.replace(
+                    /^#\s+/,
+                    ""
+                  )
+                ),
+            }}
+          />
+        );
+
+        return;
+      }
+
+      if (
+        /^>\s+/.test(line)
+      ) {
+        output.push(
+          <blockquote
+            key={index}
+          >
+            <span
+              dangerouslySetInnerHTML={{
+                __html:
+                  renderInlineMarkdown(
+                    line.replace(
+                      /^>\s+/,
+                      ""
+                    )
+                  ),
+              }}
+            />
+          </blockquote>
+        );
+
+        return;
+      }
+
+      output.push(
+        <p
+          key={index}
+          dangerouslySetInnerHTML={{
+            __html:
+              renderInlineMarkdown(
+                line
+              ),
+          }}
+        />
+      );
+    }
+  );
+
+  flushList();
+
+  return (
+    <div
+      className={`markdown-content ${className}`}
+    >
+      {output}
+    </div>
+  );
+}
+
+/* =========================================================================
+   QUESTION NORMALIZATION
+========================================================================= */
+
+function normalizeOption(option) {
+  if (
+    option === null ||
+    option === undefined
+  ) {
+    return "";
+  }
+
+  if (
+    typeof option ===
+    "object"
+  ) {
+    return safeString(
+      firstValue(
+        option.text,
+        option.label,
+        option.value,
+        option.option,
+        option.content
+      )
+    );
+  }
+
+  return safeString(option);
+}
+
+function extractQuestionSource(
+  payload
+) {
+  if (
+    Array.isArray(payload)
+  ) {
+    return payload;
+  }
+
+  if (
+    Array.isArray(
+      payload?.questions
+    )
+  ) {
+    return payload.questions;
+  }
+
+  if (
+    Array.isArray(
+      payload?.data
+    )
+  ) {
+    return payload.data;
+  }
+
+  if (
+    Array.isArray(
+      payload?.data?.questions
+    )
+  ) {
+    return payload.data.questions;
+  }
+
+  if (
+    Array.isArray(
+      payload?.level?.questions
+    )
+  ) {
+    return payload.level.questions;
+  }
+
+  if (
+    Array.isArray(
+      payload?.data?.level?.questions
+    )
+  ) {
+    return payload.data.level.questions;
+  }
+
+  return [];
+}
+
+function normalizeQuestions(
+  payload
+) {
+  const source =
+    extractQuestionSource(
+      payload
+    );
+
+  return source
+    .map(
+      (
+        item,
+        index
+      ) => {
+        const id =
+          safeString(
+            firstValue(
+              item?.id,
+              item?.questionId,
+              item?._id,
+              `technical-question-${index + 1}`
+            )
+          );
+
+        const markdown =
+          firstValue(
+            item?.questionMarkdown,
+            item?.question,
+            item?.text,
+            item?.questionText,
+            `Question ${index + 1}`
+          );
+
+        let rawOptions =
+          item?.options;
+
+        if (
+          !Array.isArray(
+            rawOptions
+          ) &&
+          rawOptions &&
+          typeof rawOptions ===
+            "object"
+        ) {
+          rawOptions =
+            Object.values(
+              rawOptions
+            );
+        }
+
+        if (
+          !Array.isArray(
+            rawOptions
+          )
+        ) {
+          rawOptions = [];
+        }
+
+        const options =
+          rawOptions
+            .map(
+              normalizeOption
+            )
+            .filter(Boolean);
+
+        return {
+          id,
+
+          question:
+            safeString(
+              markdown
+            ),
+
+          questionMarkdown:
+            safeString(
+              firstValue(
+                item?.questionMarkdown,
+                markdown
+              )
+            ),
+
+          options,
+
+          moduleId:
+            safeString(
+              item?.moduleId
+            ),
+
+          module:
+            safeString(
+              firstValue(
+                item?.module,
+                item?.moduleName,
+                item?.category,
+                "Technical"
+              )
+            ),
+
+          difficulty:
+            safeString(
+              firstValue(
+                item?.difficulty,
+                item?.level,
+                "Technical"
+              )
+            ),
+
+          number:
+            safeNumber(
+              firstValue(
+                item?.number,
+                item?.questionNumber,
+                index + 1
+              ),
+              index + 1
+            ),
+
+          images:
+            Array.isArray(
+              item?.images
+            )
+              ? item.images
+              : [],
+
+          hasImages:
+            Boolean(
+              item?.hasImages ||
+              item?.images?.length
+            ),
+        };
+      }
+    )
+    .filter(
+      (question) =>
+        question.id &&
+        question.question &&
+        question.options.length >= 2
+    );
+}
+
+/* =========================================================================
    FULLSCREEN
-============================================================ */
+========================================================================= */
 
 async function enterFullscreen() {
   try {
     if (
       !document.fullscreenElement &&
-      document.documentElement.requestFullscreen
+      document.documentElement
+        ?.requestFullscreen
     ) {
       await document.documentElement.requestFullscreen();
     }
   } catch (error) {
     console.warn(
-      "[TECHNICAL PROCTOR] Fullscreen unavailable",
+      "[ENGVIVA PROCTOR] Fullscreen unavailable",
       error
     );
   }
@@ -640,165 +854,273 @@ async function exitFullscreen() {
   } catch {}
 }
 
-/* ============================================================
-   MAIN COMPONENT
-============================================================ */
+/* =========================================================================
+   TIME
+========================================================================= */
+
+function formatTime(
+  seconds
+) {
+  const safe =
+    Math.max(
+      0,
+      Math.floor(
+        safeNumber(
+          seconds
+        )
+      )
+    );
+
+  const hours =
+    Math.floor(
+      safe / 3600
+    );
+
+  const minutes =
+    Math.floor(
+      (safe % 3600) /
+        60
+    );
+
+  const secs =
+    safe % 60;
+
+  if (hours > 0) {
+    return `${String(
+      hours
+    ).padStart(2, "0")}:${String(
+      minutes
+    ).padStart(2, "0")}:${String(
+      secs
+    ).padStart(2, "0")}`;
+  }
+
+  return `${String(
+    minutes
+  ).padStart(2, "0")}:${String(
+    secs
+  ).padStart(2, "0")}`;
+}
+
+/* =========================================================================
+   COMPONENT
+========================================================================= */
 
 export default function TechnicalAssessment() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const params = useParams();
+  const navigate =
+    useNavigate();
 
-  const query = useMemo(
-    () => new URLSearchParams(location.search),
-    [location.search]
-  );
+  const location =
+    useLocation();
 
-  const companyId = normalizeId(
-    firstValue(
-      params.companyId,
-      query.get("company"),
-      query.get("companyId"),
-      location.state?.companyId,
-      location.state?.company?.id
-    )
-  );
+  const {
+    companyId:
+      routeCompanyId,
+    levelNumber:
+      routeLevelNumber,
+  } = useParams();
 
-  const levelNumber = safeNumber(
-    firstValue(
-      params.levelNumber,
-      query.get("level"),
-      location.state?.levelNumber
-    ),
-    0
-  );
+  const query =
+    useMemo(
+      () =>
+        new URLSearchParams(
+          location.search
+        ),
+      [location.search]
+    );
 
-  const roleFromUrl = String(
-    firstValue(
-      query.get("role"),
-      location.state?.role,
-      "Software Engineer"
-    )
-  );
+  const companyId =
+    normalizeId(
+      firstValue(
+        routeCompanyId,
+        query.get("company"),
+        query.get("companyId"),
+        location.state?.companyId
+      )
+    );
+
+  const levelNumber =
+    safeNumber(
+      firstValue(
+        routeLevelNumber,
+        query.get("level"),
+        location.state?.levelNumber
+      ),
+      0
+    );
 
   const isResultRoute =
-    location.pathname.endsWith("/result");
+    location.pathname.endsWith(
+      "/result"
+    );
 
-  const hasLevelRoute = Boolean(
-    companyId && levelNumber
-  );
+  const [screen, setScreen] =
+    useState(
+      isResultRoute
+        ? "result"
+        : levelNumber
+        ? "running"
+        : companyId
+        ? "levels"
+        : "companies"
+    );
 
-  const [screen, setScreen] = useState(() => {
-    if (isResultRoute) return "result";
-
-    if (hasLevelRoute) return "running";
-
-    if (companyId) return "levels";
-
-    return "companies";
-  });
-
-  /* ----------------------------------------------------------
-     COMPANY
-  ---------------------------------------------------------- */
-
-  const [companies, setCompanies] = useState(
+  const [
+    companies,
+    setCompanies,
+  ] = useState(
     FALLBACK_COMPANIES
   );
 
-  const [selectedCompany, setSelectedCompany] =
-    useState(
+  const [
+    companiesLoading,
+    setCompaniesLoading,
+  ] = useState(false);
+
+  const [
+    selectedCompany,
+    setSelectedCompany,
+  ] = useState(
+    getCompanyFromList(
+      FALLBACK_COMPANIES,
       companyId
-        ? getFallbackCompany(companyId)
-        : null
-    );
+    )
+  );
 
-  const [companiesLoading, setCompaniesLoading] =
-    useState(false);
+  const [
+    levels,
+    setLevels,
+  ] = useState([]);
 
-  /* ----------------------------------------------------------
-     LEVELS
-  ---------------------------------------------------------- */
+  const [
+    levelsLoading,
+    setLevelsLoading,
+  ] = useState(false);
 
-  const [levels, setLevels] = useState([]);
+  const [
+    selectedLevel,
+    setSelectedLevel,
+  ] = useState(
+    levelNumber || null
+  );
 
-  const [levelsLoading, setLevelsLoading] =
-    useState(false);
+  const [
+    questions,
+    setQuestions,
+  ] = useState([]);
 
-  /* ----------------------------------------------------------
-     TEST
-  ---------------------------------------------------------- */
+  const [
+    currentIndex,
+    setCurrentIndex,
+  ] = useState(0);
 
-  const [questions, setQuestions] = useState([]);
+  const [
+    answers,
+    setAnswers,
+  ] = useState({});
 
-  const [currentIndex, setCurrentIndex] =
-    useState(0);
+  const answersRef =
+    useRef({});
 
-  const [answers, setAnswers] = useState({});
+  const [
+    attemptId,
+    setAttemptId,
+  ] = useState(null);
 
-  const answersRef = useRef({});
+  const attemptIdRef =
+    useRef(null);
 
-  const [attemptId, setAttemptId] =
-    useState(null);
+  const [
+    startedAt,
+    setStartedAt,
+  ] = useState(null);
 
-  const [startedAt, setStartedAt] =
-    useState(null);
+  const startedAtRef =
+    useRef(null);
 
-  const startedAtRef = useRef(null);
+  const [
+    timeAllowed,
+    setTimeAllowed,
+  ] = useState(0);
 
-  const [timeAllowed, setTimeAllowed] =
-    useState(0);
+  const [
+    remainingSeconds,
+    setRemainingSeconds,
+  ] = useState(0);
 
-  const [remainingSeconds, setRemainingSeconds] =
-    useState(0);
+  const remainingRef =
+    useRef(0);
 
-  const remainingRef = useRef(0);
+  const [
+    loadingTest,
+    setLoadingTest,
+  ] = useState(false);
 
-  const [loadingTest, setLoadingTest] =
-    useState(false);
+  const [
+    submitting,
+    setSubmitting,
+  ] = useState(false);
 
-  const [submitting, setSubmitting] =
-    useState(false);
+  const submittingRef =
+    useRef(false);
 
-  const [showSubmit, setShowSubmit] =
-  useState(false);
+  const [
+    result,
+    setResult,
+  ] = useState(null);
 
-  const submittingRef = useRef(false);
+  const [
+    error,
+    setError,
+  ] = useState("");
 
-  const [result, setResult] =
-    useState(null);
+  const [
+    showSubmit,
+    setShowSubmit,
+  ] = useState(false);
 
-  const [error, setError] = useState("");
+  const [
+    violations,
+    setViolations,
+  ] = useState([]);
 
-  /* ----------------------------------------------------------
-     PROCTORING
-  ---------------------------------------------------------- */
+  const violationsRef =
+    useRef([]);
 
-  const [violations, setViolations] =
-    useState([]);
+  const [
+    proctorWarning,
+    setProctorWarning,
+  ] = useState("");
 
-  const violationsRef = useRef([]);
+  const [
+    proctorLocked,
+    setProctorLocked,
+  ] = useState(false);
 
-  const [proctorWarning, setProctorWarning] =
-    useState("");
+  const timerRef =
+    useRef(null);
 
-  const [proctorLocked, setProctorLocked] =
-    useState(false);
+  const submitRef =
+    useRef(null);
 
-  const timerRef = useRef(null);
-
-  const submitRef = useRef(null);
-
-  const violationLockRef = useRef(false);
-  const fullscreenGraceRef = useRef(false);
-
-  /* ----------------------------------------------------------
-     SYNCHRONIZE REFS
-  ---------------------------------------------------------- */
+  /* =======================================================================
+     REFS
+  ======================================================================= */
 
   useEffect(() => {
-    answersRef.current = answers;
+    answersRef.current =
+      answers;
   }, [answers]);
+
+  useEffect(() => {
+    attemptIdRef.current =
+      attemptId;
+  }, [attemptId]);
+
+  useEffect(() => {
+    startedAtRef.current =
+      startedAt;
+  }, [startedAt]);
 
   useEffect(() => {
     remainingRef.current =
@@ -806,123 +1128,248 @@ export default function TechnicalAssessment() {
   }, [remainingSeconds]);
 
   useEffect(() => {
-    startedAtRef.current = startedAt;
-  }, [startedAt]);
+    submittingRef.current =
+      submitting;
+  }, [submitting]);
 
   useEffect(() => {
     violationsRef.current =
       violations;
   }, [violations]);
 
-  /*
-   * Keep route and screen state synchronized when React Router
-   * reuses this component for a different CompanyDetails link.
-   */
-  useEffect(() => {
-    if (screen === "running") return;
-
-    if (isResultRoute) {
-      setScreen("result");
-      return;
-    }
-
-    if (companyId) {
-      setSelectedCompany((current) =>
-        current?.id === companyId
-          ? current
-          : getFallbackCompany(companyId)
-      );
-      setScreen("levels");
-      return;
-    }
-
-    setSelectedCompany(null);
-    setLevels([]);
-    setScreen("companies");
-  }, [companyId, isResultRoute, screen]);
-
-  /* ----------------------------------------------------------
+  /* =======================================================================
      COMPANY
-  ---------------------------------------------------------- */
+  ======================================================================= */
 
-  const company = useMemo(() => {
-    if (selectedCompany) {
-      return selectedCompany;
-    }
+  const company =
+    selectedCompany ||
+    getCompanyFromList(
+      companies,
+      companyId
+    );
 
-    if (companyId) {
-      return getFallbackCompany(companyId);
-    }
+  /* =======================================================================
+     NAVIGATION
+  ======================================================================= */
 
-    return null;
-  }, [
-    selectedCompany,
-    companyId,
-  ]);
+  const goCompanies =
+    useCallback(() => {
+      clearAttempt();
 
-  /* ==========================================================
-     LOAD COMPANIES
-  ========================================================== */
+      setSelectedCompany(
+        null
+      );
 
-  const loadCompanies = useCallback(
-    async () => {
-      setCompaniesLoading(true);
+      setSelectedLevel(
+        null
+      );
+
+      setLevels([]);
+
+      setQuestions([]);
+
+      setAnswers({});
+
+      setResult(null);
+
       setError("");
 
-      try {
-        /*
-          If your backend exposes /companies this will be
-          completely dynamic.
+      setScreen(
+        "companies"
+      );
 
-          If that endpoint is not deployed yet, the real
-          fallback company metadata is used so the UI does
-          not break.
-        */
-        const payload = await apiFetch(
-          "/api/technical/companies"
+      navigate(
+        "/technical-lab",
+        {
+          replace: true,
+        }
+      );
+    }, [navigate]);
+
+  const goLevels =
+    useCallback(
+      (
+        targetCompanyId
+      ) => {
+        const id =
+          normalizeId(
+            targetCompanyId
+          );
+
+        if (!id) {
+          goCompanies();
+          return;
+        }
+
+        const selected =
+          getCompanyFromList(
+            companies,
+            id
+          );
+
+        clearAttempt();
+
+        setSelectedCompany(
+          selected
         );
 
-        const root =
-          payload?.data ?? payload;
+        setSelectedLevel(
+          null
+        );
 
-        const source = Array.isArray(root)
-          ? root
-          : Array.isArray(root?.companies)
-          ? root.companies
-          : Array.isArray(payload?.companies)
-          ? payload.companies
-          : [];
+        setQuestions([]);
 
-        if (source.length) {
-          setCompanies(
-            source
-              .map(normalizeCompany)
-              .filter((item) => item.id)
+        setAnswers({});
+
+        setResult(null);
+
+        setError("");
+
+        setScreen(
+          "levels"
+        );
+
+        navigate(
+          `/technical-lab/${encodeURIComponent(
+            id
+          )}/levels`,
+          {
+            replace: true,
+          }
+        );
+      },
+      [
+        companies,
+        goCompanies,
+        navigate,
+      ]
+    );
+
+  /* =======================================================================
+     LOAD COMPANIES
+  ======================================================================= */
+
+  const loadCompanies =
+    useCallback(
+      async () => {
+        setCompaniesLoading(
+          true
+        );
+
+        setError("");
+
+        try {
+          /*
+           * Try the company endpoint
+           * first.
+           *
+           * If the backend does not
+           * provide it, fallback data
+           * keeps the screen usable.
+           */
+
+          const response =
+            await fetch(
+              `${API_BASE}/api/technical/companies`
+            );
+
+          const payload =
+            await response
+              .json()
+              .catch(
+                () => ({})
+              );
+
+          if (
+            response.ok
+          ) {
+            const source =
+              Array.isArray(
+                payload
+                  ?.companies
+              )
+                ? payload.companies
+                : Array.isArray(
+                    payload
+                      ?.data
+                  )
+                ? payload.data
+                : [];
+
+            if (
+              source.length
+            ) {
+              setCompanies(
+                source.map(
+                  (item) => ({
+                    id:
+                      normalizeId(
+                        firstValue(
+                          item?.id,
+                          item?.companyId,
+                          item?.slug
+                        )
+                      ),
+
+                    name:
+                      firstValue(
+                        item?.name,
+                        item?.companyName,
+                        item?.title
+                      ),
+
+                    category:
+                      firstValue(
+                        item?.category,
+                        "Technology"
+                      ),
+
+                    domain:
+                      firstValue(
+                        item?.domain,
+                        item?.website
+                      ),
+
+                    description:
+                      firstValue(
+                        item?.description,
+                        "Technical assessment preparation"
+                      ),
+                  })
+                ).filter(
+                  (item) =>
+                    item.id &&
+                    item.name
+                )
+              );
+            }
+          }
+        } catch (err) {
+          console.warn(
+            "[TECHNICAL COMPANIES]",
+            err
+          );
+
+          /*
+           * Do NOT destroy the UI
+           * when optional company
+           * discovery endpoint is
+           * unavailable.
+           */
+        } finally {
+          setCompaniesLoading(
+            false
           );
         }
-      } catch (error) {
-        /*
-          404 here must NOT break Technical Lab.
-          The technical company metadata fallback is
-          used only for navigation metadata.
-        */
-
-        console.warn(
-          "[TECHNICAL COMPANIES] Dynamic endpoint unavailable; using metadata fallback."
-        );
-
-        setCompanies(
-          FALLBACK_COMPANIES
-        );
-      } finally {
-        setCompaniesLoading(false);
-      }
-    },
-    []
-  );
+      },
+      []
+    );
 
   useEffect(() => {
-    if (screen === "companies") {
+    if (
+      screen ===
+      "companies"
+    ) {
       loadCompanies();
     }
   }, [
@@ -930,111 +1377,124 @@ export default function TechnicalAssessment() {
     loadCompanies,
   ]);
 
-  /* ==========================================================
-     LOAD LEVELS
-  ========================================================== */
+  /* =======================================================================
+     LOAD COMPANY LEVELS
+  ======================================================================= */
 
-  const loadLevels = useCallback(
-    async (id) => {
-      if (!id) return;
-
-      setLevelsLoading(true);
-      setError("");
-
-      try {
-        const payload = await apiFetch(
-          `/api/technical/company/${encodeURIComponent(
-            id
-          )}/levels`
-        );
-
-        const root =
-          payload?.data ?? payload;
-
-        const parsed = Array.isArray(root)
-          ? root
-          : Array.isArray(root?.levels)
-          ? root.levels
-          : Array.isArray(root?.items)
-          ? root.items
-          : Array.isArray(root?.data)
-          ? root.data
-          : [];
-
-        if (!parsed.length) {
-          throw new Error(
-            `No technical levels are available for ${
-              getFallbackCompany(id).name
-            }.`
-          );
+  const loadLevels =
+    useCallback(
+      async (
+        id
+      ) => {
+        if (!id) {
+          return;
         }
 
-        setLevels(parsed);
+        setLevelsLoading(
+          true
+        );
 
-        /*
-         * Company profile is metadata only. If this endpoint is
-         * unavailable, keep the safe local company metadata.
-         */
+        setError("");
+
         try {
-          const companyPayload =
+          const payload =
             await apiFetch(
               `/api/technical/company/${encodeURIComponent(
                 id
-              )}`
+              )}/levels`
             );
+
+          const source =
+            Array.isArray(
+              payload?.levels
+            )
+              ? payload.levels
+              : Array.isArray(
+                  payload?.data?.levels
+                )
+              ? payload.data.levels
+              : [];
 
           const normalized =
-            normalizeCompany(
-              companyPayload?.data ??
-                companyPayload?.company ??
-                companyPayload
-            );
+            source
+              .map(
+                (
+                  level,
+                  index
+                ) => ({
+                  ...level,
 
-          if (normalized.id) {
-            setSelectedCompany(
-              normalized
-            );
-          }
-        } catch (profileError) {
-          console.warn(
-            "[TECHNICAL COMPANY PROFILE] Using fallback metadata.",
-            profileError
+                  level:
+                    safeNumber(
+                      firstValue(
+                        level?.level,
+                        level?.levelNumber,
+                        index + 1
+                      ),
+                      index + 1
+                    ),
+
+                  title:
+                    firstValue(
+                      level?.title,
+                      `Level ${
+                        index + 1
+                      }`
+                    ),
+
+                  difficulty:
+                    firstValue(
+                      level?.difficulty,
+                      "Technical"
+                    ),
+
+                  questionCount:
+                    safeNumber(
+                      level?.questionCount,
+                      0
+                    ),
+
+                  estimatedMinutes:
+                    safeNumber(
+                      level?.estimatedMinutes,
+                      0
+                    ),
+                })
+              );
+
+          setLevels(
+            normalized
+          );
+        } catch (err) {
+          console.error(
+            "[TECHNICAL LEVELS]",
+            err
+          );
+
+          setLevels([]);
+
+          setError(
+            err.message ||
+              "Unable to load technical levels."
+          );
+        } finally {
+          setLevelsLoading(
+            false
           );
         }
-      } catch (error) {
-        console.error(
-          "[TECHNICAL LEVELS]",
-          error
-        );
-
-        setLevels([]);
-
-        setError(
-          error.message ||
-            "Unable to load technical levels."
-        );
-      } finally {
-        setLevelsLoading(false);
-      }
-    },
-    []
-  );
+      },
+      []
+    );
 
   useEffect(() => {
     if (
-      screen === "levels" &&
+      screen ===
+        "levels" &&
       companyId
     ) {
-      setSelectedCompany(
-        (current) =>
-          current?.id === companyId
-            ? current
-            : getFallbackCompany(
-                companyId
-              )
+      loadLevels(
+        companyId
       );
-
-      loadLevels(companyId);
     }
   }, [
     screen,
@@ -1042,421 +1502,319 @@ export default function TechnicalAssessment() {
     loadLevels,
   ]);
 
-  /* ==========================================================
-     NAVIGATION
-  ========================================================== */
+  /* =======================================================================
+     LOAD LEVEL QUESTIONS
+  ======================================================================= */
 
-  const goCompanies = useCallback(() => {
-    clearAttempt();
-    clearResult();
-
-    exitFullscreen();
-
-    setSelectedCompany(null);
-    setLevels([]);
-    setQuestions([]);
-    setAnswers({});
-    setAttemptId(null);
-    setResult(null);
-    setError("");
-
-    setScreen("companies");
-
-    navigate(
-      "/technical-lab",
-      {
-        replace: true,
-      }
-    );
-  }, [navigate]);
-
-  const goLevels = useCallback(
-    (id) => {
-      const normalized =
-        normalizeId(id);
-
-      if (!normalized) {
-        goCompanies();
-        return;
-      }
-
-      clearAttempt();
-      clearResult();
-
-      setSelectedCompany(
-        getFallbackCompany(
-          normalized
-        )
-      );
-
-      setQuestions([]);
-      setAnswers({});
-      setResult(null);
-      setError("");
-
-      setScreen("levels");
-
-      navigate(
-        `/technical-lab/${encodeURIComponent(
-          normalized
-        )}/levels`,
-        {
-          replace: true,
-        }
-      );
-    },
-    [
-      navigate,
-      goCompanies,
-    ]
-  );
-
-  const chooseCompany = useCallback(
-    async (item) => {
-      await exitFullscreen();
-
-      const normalized =
-        normalizeCompany(item);
-
-      setSelectedCompany(
-        normalized
-      );
-
-      setLevels([]);
-      setQuestions([]);
-      setAnswers({});
-      setError("");
-
-      setScreen("levels");
-
-      navigate(
-        `/technical-lab/${encodeURIComponent(
-          normalized.id
-        )}/levels?role=${encodeURIComponent(
-          roleFromUrl
-        )}`,
-        {
-          replace: true,
-          state: {
-            companyId:
-              normalized.id,
-            company:
-              normalized,
-            role: roleFromUrl,
-          },
-        }
-      );
-    },
-    [navigate]
-  );
-
-  /* ==========================================================
-     LOAD ALL QUESTIONS
-  ========================================================== */
-
-  const loadAllQuestions =
+  const loadLevelQuestions =
     useCallback(
-      async (id, level) => {
+      async (
+        id,
+        level
+      ) => {
         /*
-         * Canonical backend endpoint.
-         * Older deployments may expose /questions, so only a
-         * 404 activates the compatibility fallback.
+         * Your verified backend route:
+         *
+         * GET
+         * /api/technical/company/google/levels/1
          */
-        try {
-          const payload =
-            await apiFetch(
-              `/api/technical/company/${encodeURIComponent(
-                id
-              )}/levels/${level}`
-            );
 
-          const normalized =
-            normalizeQuestions(
-              payload
-            );
+        const payload =
+          await apiFetch(
+            `/api/technical/company/${encodeURIComponent(
+              id
+            )}/levels/${encodeURIComponent(
+              level
+            )}`
+          );
 
-          if (!normalized.length) {
-            throw new Error(
-              "This technical level contains no usable questions."
-            );
-          }
+        const normalized =
+          normalizeQuestions(
+            payload
+          );
 
-          return normalized;
-        } catch (error) {
-          if (error.status !== 404) {
-            throw error;
-          }
-
-          const payload =
-            await apiFetch(
-              `/api/technical/company/${encodeURIComponent(
-                id
-              )}/levels/${level}/questions`
-            );
-
-          const normalized =
-            normalizeQuestions(
-              payload
-            );
-
-          if (!normalized.length) {
-            throw new Error(
-              "This technical level contains no usable questions."
-            );
-          }
-
-          return normalized;
+        if (
+          !normalized.length
+        ) {
+          throw new Error(
+            "This technical level contains no usable questions."
+          );
         }
+
+        return normalized;
       },
       []
     );
 
-  /* ==========================================================
+  /* =======================================================================
      START LEVEL
-  ========================================================== */
+  ======================================================================= */
 
-  const startLevel = useCallback(
-    async (level) => {
-      if (
-        !selectedCompany ||
-        loadingTest
-      ) {
-        return;
-      }
-
-      const number = safeNumber(
-        firstValue(
-          level?.level,
-          level?.levelNumber
-        )
-      );
-
-      if (!number) {
-        setError(
-          "This technical level has an invalid level number."
-        );
-        return;
-      }
-
-      setLoadingTest(true);
-      setError("");
-
-      /*
-       * Fullscreen is requested before the first network await,
-       * preserving the browser user-gesture requirement.
-       */
-      enterFullscreen();
-
-      try {
-        /*
-         * BACKEND CONTRACT:
-         * POST /api/technical/assessment/start
-         * body: { companyId, levelNumber }
-         */
-        const startPayload =
-          await apiFetch(
-            "/api/technical/assessment/start",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                companyId:
-                  selectedCompany.id,
-                levelNumber: number,
-              }),
-            }
-          );
-
-        const attempt =
-          startPayload?.data ??
-          startPayload;
-
-        const id = firstValue(
-          attempt?.attemptId,
-          startPayload?.attemptId
-        );
-
-        if (!id) {
-          throw new Error(
-            "Server did not return an attempt ID."
-          );
+  const startLevel =
+    useCallback(
+      async (
+        level
+      ) => {
+        if (
+          !selectedCompany ||
+          loadingTest
+        ) {
+          return;
         }
 
-        /*
-         * Load questions only after the server attempt exists.
-         */
-        const normalized =
-          await loadAllQuestions(
-            selectedCompany.id,
-            number
+        const number =
+          safeNumber(
+            firstValue(
+              level?.level,
+              level?.levelNumber
+            ),
+            0
           );
 
-        let durationMinutes =
-          Math.max(
-            1,
-            safeNumber(
-              firstValue(
-                attempt?.level?.estimatedMinutes,
-                attempt?.estimatedMinutes,
-                level?.estimatedMinutes,
-                60
-              ),
-              60
-            )
+        if (!number) {
+          setError(
+            "Invalid technical level."
           );
 
-        /*
-         * Read authoritative level metadata when available.
-         * Failure here must not destroy an otherwise valid test.
-         */
+          return;
+        }
+
+        setLoadingTest(
+          true
+        );
+
+        setError("");
+
         try {
-          const levelPayload =
-            await apiFetch(
-              `/api/technical/company/${encodeURIComponent(
-                selectedCompany.id
-              )}/levels/${number}`
+          /*
+           * Load the actual questions
+           * before creating the attempt.
+           */
+
+          const normalized =
+            await loadLevelQuestions(
+              selectedCompany.id,
+              number
             );
 
-          const levelRoot =
-            levelPayload?.data ??
-            levelPayload;
+          /*
+           * Start protected backend
+           * attempt.
+           */
 
-          durationMinutes =
+          const startPayload =
+            await apiFetch(
+              "/api/technical/assessment/start",
+              {
+                method: "POST",
+
+                body:
+                  JSON.stringify({
+                    companyId:
+                      selectedCompany.id,
+
+                    levelNumber:
+                      number,
+
+                    totalQuestions:
+                      normalized.length,
+
+                    mode:
+                      "proctored",
+
+                    proctoringMode:
+                      "browser_fullscreen",
+                  }),
+              }
+            );
+
+          const attempt =
+            startPayload?.data ??
+            startPayload;
+
+          const id =
+            firstValue(
+              attempt?.attemptId,
+              attempt?.assessmentId,
+              attempt?.id,
+              startPayload?.attemptId
+            );
+
+          if (!id) {
+            throw new Error(
+              "The backend did not return an attempt ID."
+            );
+          }
+
+          const minutes =
             Math.max(
               1,
               safeNumber(
                 firstValue(
-                  levelRoot?.estimatedMinutes,
-                  levelRoot?.level?.estimatedMinutes,
-                  durationMinutes
+                  attempt?.estimatedMinutes,
+                  level?.estimatedMinutes,
+                  60
                 ),
-                durationMinutes
+                60
               )
             );
-        } catch {
-          /* Keep the valid fallback duration. */
-        }
 
-        const allowedSeconds =
-          Math.max(
-            60,
-            Math.round(
-              durationMinutes * 60
-            )
+          const allowed =
+            Math.max(
+              60,
+              Math.round(
+                minutes * 60
+              )
+            );
+
+          const now =
+            new Date().toISOString();
+
+          const session = {
+            attemptId: id,
+
+            companyId:
+              selectedCompany.id,
+
+            levelNumber:
+              number,
+
+            startedAt:
+              now,
+
+            timeAllowed:
+              allowed,
+
+            questions:
+              normalized,
+
+            answers: {},
+
+            currentIndex: 0,
+
+            violations: [],
+          };
+
+          saveAttempt(
+            session
           );
 
-        const now =
-          new Date().toISOString();
+          clearResult();
 
-        const session = {
-          attemptId: id,
-          companyId:
-            selectedCompany.id,
-          levelNumber: number,
-          startedAt: now,
-          timeAllowed:
-            allowedSeconds,
-          questions: normalized,
-          answers: {},
-          currentIndex: 0,
-          violations: [],
-        };
+          setAttemptId(id);
 
-        saveAttempt(session);
-        clearResult();
+          setSelectedLevel(
+            number
+          );
 
-        setAttemptId(id);
-        setQuestions(normalized);
-        setAnswers({});
-        answersRef.current = {};
-        setCurrentIndex(0);
+          setQuestions(
+            normalized
+          );
 
-        setStartedAt(now);
-        startedAtRef.current = now;
+          setAnswers({});
 
-        setTimeAllowed(
-          allowedSeconds
-        );
+          answersRef.current =
+            {};
 
-        setRemainingSeconds(
-          allowedSeconds
-        );
+          setCurrentIndex(
+            0
+          );
 
-        remainingRef.current =
-          allowedSeconds;
+          setStartedAt(
+            now
+          );
 
-        setViolations([]);
-        violationsRef.current = [];
+          startedAtRef.current =
+            now;
 
-        setProctorWarning("");
-        setProctorLocked(false);
-        setShowSubmit(false);
-        setResult(null);
+          setTimeAllowed(
+            allowed
+          );
 
-        /*
-         * Ignore the browser's own fullscreen transition for
-         * 1.5 seconds so it cannot self-trigger a violation.
-         */
-        fullscreenGraceRef.current = true;
+          setRemainingSeconds(
+            allowed
+          );
 
-        setTimeout(() => {
-          fullscreenGraceRef.current = false;
-        }, 1500);
+          remainingRef.current =
+            allowed;
 
-        setScreen("running");
+          setViolations([]);
 
-        navigate(
-          `/technical-lab/${encodeURIComponent(
-            selectedCompany.id
-          )}/level/${number}`,
-          {
-            replace: true,
-            state: {
-              companyId:
-                selectedCompany.id,
-              levelNumber: number,
-              role: roleFromUrl,
-              attemptId: id,
-            },
-          }
-        );
-      } catch (error) {
-        console.error(
-          "[TECHNICAL START]",
-          error
-        );
+          violationsRef.current =
+            [];
 
-        await exitFullscreen();
+          setProctorWarning(
+            ""
+          );
 
-        setError(
-          error.message ||
-            "Unable to start technical assessment."
-        );
-      } finally {
-        setLoadingTest(false);
-      }
-    },
-    [
-      selectedCompany,
-      loadingTest,
-      loadAllQuestions,
-      navigate,
-      roleFromUrl,
-    ]
-  );
+          setProctorLocked(
+            false
+          );
 
-  /* ==========================================================
-     RESTORE ACTIVE ATTEMPT
-  ========================================================== */
+          setShowSubmit(
+            false
+          );
+
+          setResult(null);
+
+          /*
+           * Canonical active-test
+           * route.
+           */
+
+          navigate(
+            `/technical-lab/${encodeURIComponent(
+              selectedCompany.id
+            )}/level/${number}`,
+            {
+              replace: true,
+            }
+          );
+
+          setScreen(
+            "running"
+          );
+
+          /*
+           * Fullscreen must be
+           * requested as part of the
+           * start click.
+           */
+
+          await enterFullscreen();
+        } catch (err) {
+          console.error(
+            "[TECHNICAL START]",
+            err
+          );
+
+          setError(
+            err.message ||
+              "Unable to start technical assessment."
+          );
+        } finally {
+          setLoadingTest(
+            false
+          );
+        }
+      },
+      [
+        selectedCompany,
+        loadingTest,
+        loadLevelQuestions,
+        navigate,
+      ]
+    );
+
+  /* =======================================================================
+     RESTORE ATTEMPT
+  ======================================================================= */
 
   useEffect(() => {
     if (
-      !hasLevelRoute ||
-      isResultRoute
+      screen !==
+      "running"
     ) {
-      return;
-    }
-
-    if (questions.length) {
       return;
     }
 
@@ -1464,530 +1822,159 @@ export default function TechnicalAssessment() {
       readAttempt();
 
     if (
-      !saved ||
-      String(saved.companyId) !==
-        String(companyId) ||
-      Number(saved.levelNumber) !==
-        Number(levelNumber)
+      !saved?.attemptId
     ) {
-      /*
-        Direct navigation to a test URL without an active
-        attempt should NEVER create a fake test.
-      */
-      setScreen("levels");
-
-      navigate(
-        `/technical-lab/${encodeURIComponent(
-          companyId
-        )}/levels`,
-        {
-          replace: true,
-        }
-      );
-
       return;
     }
 
-    const started =
-      new Date(
-        saved.startedAt
-      ).getTime();
+    /*
+     * Restore only if the saved
+     * attempt belongs to the
+     * current route.
+     */
 
-    const elapsed = Math.floor(
-      (Date.now() - started) /
-        1000
-    );
-
-    const remaining = Math.max(
-      0,
+    if (
+      normalizeId(
+        saved.companyId
+      ) !==
+        normalizeId(
+          companyId
+        ) ||
       safeNumber(
-        saved.timeAllowed
-      ) - elapsed
-    );
-
-    setSelectedCompany(
-      getFallbackCompany(
-        companyId
-      )
-    );
+        saved.levelNumber
+      ) !==
+        safeNumber(
+          levelNumber
+        )
+    ) {
+      return;
+    }
 
     setAttemptId(
       saved.attemptId
     );
 
+    setSelectedLevel(
+      saved.levelNumber
+    );
+
     setQuestions(
-      saved.questions || []
+      Array.isArray(
+        saved.questions
+      )
+        ? saved.questions
+        : []
     );
 
     setAnswers(
-      saved.answers || {}
+      saved.answers ||
+        {}
     );
 
     answersRef.current =
-      saved.answers || {};
+      saved.answers ||
+      {};
 
     setCurrentIndex(
-      Math.min(
-        safeNumber(
-          saved.currentIndex
-        ),
-        Math.max(
-          0,
-          (saved.questions || [])
-            .length - 1
-        )
+      safeNumber(
+        saved.currentIndex,
+        0
       )
     );
 
     setStartedAt(
-      saved.startedAt
+      saved.startedAt ||
+        null
     );
-
-    startedAtRef.current =
-      saved.startedAt;
 
     setTimeAllowed(
       safeNumber(
-        saved.timeAllowed
+        saved.timeAllowed,
+        0
       )
     );
 
-    setRemainingSeconds(
-      remaining
-    );
-
-    remainingRef.current =
-      remaining;
-
     setViolations(
-      saved.violations || []
+      Array.isArray(
+        saved.violations
+      )
+        ? saved.violations
+        : []
     );
-
-    violationsRef.current =
-      saved.violations || [];
-
-    setScreen("running");
-
-    if (remaining <= 0) {
-      setTimeout(() => {
-        submitRef.current?.(
-          true,
-          "TIME_EXPIRED"
-        );
-      }, 0);
-    }
   }, [
-    hasLevelRoute,
-    isResultRoute,
-    questions.length,
+    screen,
     companyId,
     levelNumber,
-    navigate,
   ]);
 
-  /* ==========================================================
-     PERSIST ACTIVE TEST
-  ========================================================== */
+  /* =======================================================================
+     ANSWER SELECTION
+  ======================================================================= */
 
-  useEffect(() => {
-    if (
-      screen !== "running" ||
-      !attemptId ||
-      !questions.length
-    ) {
-      return;
-    }
-
-    const persist = () => {
-      saveAttempt({
-        attemptId,
-        companyId: company?.id,
-        levelNumber,
-        startedAt,
-        timeAllowed,
-        questions,
-        answers: answersRef.current,
-        currentIndex,
-        violations: violationsRef.current,
-      });
-    };
-
-    persist();
-
-    window.addEventListener(
-      "beforeunload",
-      persist
-    );
-
-    window.addEventListener(
-      "pagehide",
-      persist
-    );
-
-    return () => {
-      window.removeEventListener(
-        "beforeunload",
-        persist
-      );
-
-      window.removeEventListener(
-        "pagehide",
-        persist
-      );
-    };
-  }, [
-    screen,
-    attemptId,
-    company?.id,
-    levelNumber,
-    startedAt,
-    timeAllowed,
-    questions,
-    answers,
-    currentIndex,
-    violations,
-  ]);
-
-  /* ==========================================================
-     PROCTORING
-  ========================================================== */
-
-  const addViolation =
+  const chooseAnswer =
     useCallback(
-      (type, detail) => {
+      (
+        questionId,
+        optionIndex
+      ) => {
         if (
-          screen !== "running" ||
-          submittingRef.current ||
-          violationLockRef.current
+          submitting ||
+          proctorLocked
         ) {
           return;
         }
 
-        violationLockRef.current =
-          true;
+        setAnswers(
+          (previous) => {
+            const next = {
+              ...previous,
 
-        const item = {
-          type,
-          detail:
-            detail ||
-            "Proctoring event detected.",
-          at:
-            new Date().toISOString(),
-        };
+              [questionId]:
+                optionIndex,
+            };
 
-        setViolations(
-          (previous) => [
-            ...previous,
-            item,
-          ]
-        );
+            answersRef.current =
+              next;
 
-        setProctorWarning(
-          item.detail
-        );
+            const saved =
+              readAttempt();
 
-        setTimeout(() => {
-          violationLockRef.current =
-            false;
-        }, 800);
-      },
-      [screen]
-    );
+            if (saved) {
+              saveAttempt({
+                ...saved,
 
-  useEffect(() => {
-    if (
-      screen !== "running"
-    ) {
-      return;
-    }
+                answers:
+                  next,
 
-    const visibilityHandler =
-      () => {
-        if (
-          document.hidden
-        ) {
-          addViolation(
-            "TAB_SWITCH",
-            "Tab or window change detected."
-          );
-        }
-      };
+                currentIndex:
+                  currentIndex,
+              });
+            }
 
-    const fullscreenHandler =
-      () => {
-        if (
-          fullscreenGraceRef.current
-        ) {
-          return;
-        }
-
-        if (
-          !document.fullscreenElement &&
-          !document.hidden
-        ) {
-          addViolation(
-            "FULLSCREEN_EXIT",
-            "Fullscreen mode was exited."
-          );
-        }
-      };
-
-    const blurHandler =
-      () => {
-        /*
-         * Ignore transient browser/UI focus changes.
-         */
-        setTimeout(() => {
-          if (
-            document.hidden ||
-            document.hasFocus()
-          ) {
-            return;
+            return next;
           }
-
-          addViolation(
-            "WINDOW_BLUR",
-            "Assessment window lost focus."
-          );
-        }, 350);
-      };
-
-    const contextHandler =
-      (event) => {
-        event.preventDefault();
-
-        addViolation(
-          "CONTEXT_MENU",
-          "Right-click is disabled during the assessment."
         );
-      };
-
-    const copyHandler =
-      (event) => {
-        event.preventDefault();
-
-        addViolation(
-          "COPY",
-          "Copy is disabled during the assessment."
-        );
-      };
-
-    const cutHandler =
-      (event) => {
-        event.preventDefault();
-
-        addViolation(
-          "CUT",
-          "Cut is disabled during the assessment."
-        );
-      };
-
-    const pasteHandler =
-      (event) => {
-        event.preventDefault();
-
-        addViolation(
-          "PASTE",
-          "Paste is disabled during the assessment."
-        );
-      };
-
-    const dragHandler =
-      (event) => {
-        event.preventDefault();
-      };
-
-    const selectHandler =
-      (event) => {
-        event.preventDefault();
-      };
-
-    const keyHandler =
-      (event) => {
-        const key =
-          event.key.toUpperCase();
-
-        const blocked =
-          event.key === "F12" ||
-          (
-            event.ctrlKey &&
-            event.shiftKey &&
-            ["I", "J", "C"].includes(
-              key
-            )
-          ) ||
-          (
-            event.ctrlKey &&
-            ["U", "S", "P"].includes(
-              key
-            )
-          );
-
-        if (blocked) {
-          event.preventDefault();
-
-          addViolation(
-            "SHORTCUT",
-            "Restricted browser shortcut detected."
-          );
-        }
-      };
-
-    document.addEventListener(
-      "visibilitychange",
-      visibilityHandler
+      },
+      [
+        submitting,
+        proctorLocked,
+        currentIndex,
+      ]
     );
 
-    document.addEventListener(
-      "fullscreenchange",
-      fullscreenHandler
-    );
-
-    window.addEventListener(
-      "blur",
-      blurHandler
-    );
-
-    document.addEventListener(
-      "contextmenu",
-      contextHandler
-    );
-
-    document.addEventListener(
-      "copy",
-      copyHandler
-    );
-
-    document.addEventListener(
-      "cut",
-      cutHandler
-    );
-
-    document.addEventListener(
-      "paste",
-      pasteHandler
-    );
-
-    document.addEventListener(
-      "dragstart",
-      dragHandler
-    );
-
-    document.addEventListener(
-      "selectstart",
-      selectHandler
-    );
-
-    document.addEventListener(
-      "keydown",
-      keyHandler,
-      true
-    );
-
-    return () => {
-      document.removeEventListener(
-        "visibilitychange",
-        visibilityHandler
-      );
-
-      document.removeEventListener(
-        "fullscreenchange",
-        fullscreenHandler
-      );
-
-      window.removeEventListener(
-        "blur",
-        blurHandler
-      );
-
-      document.removeEventListener(
-        "contextmenu",
-        contextHandler
-      );
-
-      document.removeEventListener(
-        "copy",
-        copyHandler
-      );
-
-      document.removeEventListener(
-        "cut",
-        cutHandler
-      );
-
-      document.removeEventListener(
-        "paste",
-        pasteHandler
-      );
-
-      document.removeEventListener(
-        "dragstart",
-        dragHandler
-      );
-
-      document.removeEventListener(
-        "selectstart",
-        selectHandler
-      );
-
-      document.removeEventListener(
-        "keydown",
-        keyHandler,
-        true
-      );
-    };
-  }, [
-    screen,
-    addViolation,
-  ]);
-
-  /* ----------------------------------------------------------
-     LOCK AFTER MAX FLAGS
-  ---------------------------------------------------------- */
-
-  useEffect(() => {
-    if (
-      screen !== "running" ||
-      violations.length <
-        MAX_PROCTOR_FLAGS
-    ) {
-      return;
-    }
-
-    setProctorLocked(true);
-
-    setProctorWarning(
-      "Maximum proctoring violations reached. The attempt will be submitted."
-    );
-
-    const timer =
-      setTimeout(() => {
-        submitRef.current?.(
-          true,
-          "PROCTORING_VIOLATION_LIMIT"
-        );
-      }, 900);
-
-    return () =>
-      clearTimeout(timer);
-  }, [
-    screen,
-    violations.length,
-  ]);
-
-  /* ==========================================================
-     SUBMIT
-  ========================================================== */
+  /* =======================================================================
+     TIMER
+  ======================================================================= */
 
   const submitAssessment =
     useCallback(
       async (
         automatic = false,
-        reason = ""
+        automaticReason = ""
       ) => {
         if (
-          !attemptId ||
-          submittingRef.current
+          submittingRef.current ||
+          !attemptIdRef.current
         ) {
           return;
         }
@@ -1995,132 +1982,142 @@ export default function TechnicalAssessment() {
         submittingRef.current =
           true;
 
-        setSubmitting(true);
+        setSubmitting(
+          true
+        );
 
         clearInterval(
           timerRef.current
         );
 
         try {
-          const completedAt =
-            new Date().toISOString();
-
-          const timeUsed =
-            Math.max(
-              0,
-              timeAllowed -
-                remainingRef.current
-            );
-
           const payload =
             await apiFetch(
               "/api/technical/assessment/submit",
               {
                 method: "POST",
 
-                body: JSON.stringify({
-                  attemptId,
+                body:
+                  JSON.stringify({
+                    attemptId:
+                      attemptIdRef.current,
 
-                  companyId:
-                    company?.id,
+                    companyId:
+                      company?.id,
 
-                  levelNumber,
+                    levelNumber:
+                      selectedLevel,
 
-                  answers:
-                    answersRef.current,
+                    answers:
+                      answersRef.current,
 
-                  startedAt:
-                    startedAtRef.current,
+                    startedAt:
+                      startedAtRef.current,
 
-                  completedAt,
+                    completedAt:
+                      new Date().toISOString(),
 
-                  timeAllowedSeconds:
-                    timeAllowed,
+                    timeAllowedSeconds:
+                      timeAllowed,
 
-                  timeUsedSeconds:
-                    timeUsed,
+                    timeUsedSeconds:
+                      Math.max(
+                        0,
+                        timeAllowed -
+                          remainingRef.current
+                      ),
 
-                  automaticSubmission:
-                    automatic,
+                    automaticSubmission:
+                      automatic,
 
-                  autoSubmissionReason:
-                    reason,
+                    automaticSubmissionReason:
+                      automaticReason,
 
-                  mode: "proctored",
-
-                  proctoring: {
                     mode:
-                      "browser_fullscreen",
+                      "proctored",
 
-                    violationCount:
-                      violationsRef.current
-                        .length,
+                    proctoring: {
+                      mode:
+                        "browser_fullscreen",
 
-                    violations:
-                      violationsRef.current,
+                      violationCount:
+                        violationsRef.current
+                          .length,
 
-                    locked:
-                      proctorLocked ||
-                      violationsRef.current
-                        .length >=
-                        MAX_PROCTOR_FLAGS,
-                  },
-                }),
+                      violations:
+                        violationsRef.current,
+
+                      locked:
+                        proctorLocked,
+                    },
+                  }),
               }
             );
 
-          const serverResult =
+          const finalResult =
             payload?.data ??
-            payload?.result ??
             payload;
 
           /*
-            SERVER IS AUTHORITATIVE.
-            We do not calculate the score locally.
-          */
+           * Backend result is the
+           * authoritative score.
+           */
+
+          setResult(
+            finalResult
+          );
+
           saveResult(
-            serverResult
+            finalResult
           );
 
           clearAttempt();
 
-          setResult(
-            serverResult
+          setScreen(
+            "result"
           );
-
-          setScreen("result");
-
-          await exitFullscreen();
 
           navigate(
             `/technical-lab/${encodeURIComponent(
-              company?.id
-            )}/level/${levelNumber}/result`,
+              company.id
+            )}/level/${selectedLevel}/result`,
             {
               replace: true,
             }
           );
-        } catch (error) {
+
+          await exitFullscreen();
+        } catch (err) {
           console.error(
             "[TECHNICAL SUBMIT]",
-            error
+            err
           );
 
           setError(
-            error.message ||
+            err.message ||
               "Unable to submit technical assessment."
           );
 
           submittingRef.current =
             false;
 
-          setSubmitting(false);
+          setSubmitting(
+            false
+          );
+
+          return;
         }
+
+        setSubmitting(
+          false
+        );
+
+        submittingRef.current =
+          false;
       },
       [
-        attemptId,
-        company?.id,
-        levelNumber,
+        company,
+        selectedLevel,
         timeAllowed,
         proctorLocked,
         navigate,
@@ -2134,14 +2131,10 @@ export default function TechnicalAssessment() {
     submitAssessment,
   ]);
 
-  /* ==========================================================
-     TIMER
-  ========================================================== */
-
   useEffect(() => {
     if (
-      screen !== "running" ||
-      !questions.length
+      screen !==
+      "running"
     ) {
       clearInterval(
         timerRef.current
@@ -2155,90 +2148,224 @@ export default function TechnicalAssessment() {
     );
 
     timerRef.current =
-      setInterval(() => {
-        setRemainingSeconds(
-          (previous) => {
-            const next =
-              Math.max(
-                0,
-                previous - 1
-              );
-
-            remainingRef.current =
-              next;
-
-            if (next === 0) {
-              clearInterval(
-                timerRef.current
-              );
-
-              setTimeout(() => {
-                submitRef.current?.(
-                  true,
-                  "TIME_EXPIRED"
+      setInterval(
+        () => {
+          setRemainingSeconds(
+            (
+              previous
+            ) => {
+              const next =
+                Math.max(
+                  0,
+                  previous - 1
                 );
-              }, 0);
-            }
 
-            return next;
-          }
-        );
-      }, 1000);
+              remainingRef.current =
+                next;
+
+              if (
+                next === 0
+              ) {
+                clearInterval(
+                  timerRef.current
+                );
+
+                setTimeout(
+                  () => {
+                    submitRef.current?.(
+                      true,
+                      "TIME_EXPIRED"
+                    );
+                  },
+                  0
+                );
+              }
+
+              return next;
+            }
+          );
+        },
+        1000
+      );
 
     return () =>
       clearInterval(
         timerRef.current
       );
-  }, [
-    screen,
-    questions.length,
-  ]);
+  }, [screen]);
 
-  /* ==========================================================
-     ANSWERS
-  ========================================================== */
+  /* =======================================================================
+     PROCTORING
+  ======================================================================= */
 
-  const chooseAnswer =
+  const recordViolation =
     useCallback(
-      (questionId, index) => {
+      (
+        type,
+        message
+      ) => {
         if (
-          screen !== "running" ||
-          proctorLocked
+          screen !==
+          "running"
         ) {
           return;
         }
 
-        setAnswers(
-          (previous) => {
-            const next = {
-              ...previous,
-              [questionId]: index,
-            };
+        const event = {
+          type,
 
-            answersRef.current =
-              next;
+          message,
 
-            return next;
-          }
+          timestamp:
+            new Date().toISOString(),
+        };
+
+        const next = [
+          ...violationsRef.current,
+          event,
+        ];
+
+        violationsRef.current =
+          next;
+
+        setViolations(
+          next
         );
+
+        setProctorWarning(
+          message
+        );
+
+        const saved =
+          readAttempt();
+
+        if (saved) {
+          saveAttempt({
+            ...saved,
+
+            violations:
+              next,
+          });
+        }
+
+        if (
+          next.length >=
+          MAX_PROCTOR_FLAGS
+        ) {
+          setProctorLocked(
+            true
+          );
+
+          setTimeout(
+            () => {
+              submitRef.current?.(
+                true,
+                "PROCTORING_LIMIT"
+              );
+            },
+            300
+          );
+        }
       },
-      [
-        screen,
-        proctorLocked,
-      ]
+      [screen]
     );
+
+  useEffect(() => {
+    if (
+      screen !==
+      "running"
+    ) {
+      return;
+    }
+
+    const onVisibility =
+      () => {
+        if (
+          document.hidden
+        ) {
+          recordViolation(
+            "TAB_HIDDEN",
+            "The assessment window was hidden or another tab was activated."
+          );
+        }
+      };
+
+    const onBlur =
+      () => {
+        recordViolation(
+          "WINDOW_BLUR",
+          "The assessment window lost focus."
+        );
+      };
+
+    const onFullscreen =
+      () => {
+        if (
+          !document.fullscreenElement
+        ) {
+          recordViolation(
+            "FULLSCREEN_EXIT",
+            "Fullscreen mode was exited."
+          );
+        }
+      };
+
+    document.addEventListener(
+      "visibilitychange",
+      onVisibility
+    );
+
+    window.addEventListener(
+      "blur",
+      onBlur
+    );
+
+    document.addEventListener(
+      "fullscreenchange",
+      onFullscreen
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        onVisibility
+      );
+
+      window.removeEventListener(
+        "blur",
+        onBlur
+      );
+
+      document.removeEventListener(
+        "fullscreenchange",
+        onFullscreen
+      );
+    };
+  }, [
+    screen,
+    recordViolation,
+  ]);
+
+  /* =======================================================================
+     CLEANUP
+  ======================================================================= */
+
+  useEffect(() => {
+    return () => {
+      clearInterval(
+        timerRef.current
+      );
+    };
+  }, []);
+
+  /* =======================================================================
+     DERIVED
+  ======================================================================= */
 
   const currentQuestion =
     questions[
       currentIndex
     ];
-
-  const currentAnswer =
-    currentQuestion
-      ? answers[
-          currentQuestion.id
-        ]
-      : undefined;
 
   const answeredCount =
     questions.filter(
@@ -2258,792 +2385,476 @@ export default function TechnicalAssessment() {
   const progress =
     questions.length
       ? Math.round(
-          (answeredCount /
-            questions.length) *
+          (
+            answeredCount /
+            questions.length
+          ) *
             100
         )
       : 0;
 
-  const nextQuestion =
-    useCallback(() => {
-      setCurrentIndex(
-        (index) =>
-          Math.min(
-            questions.length - 1,
-            index + 1
-          )
-      );
-    }, [
-      questions.length,
-    ]);
+  const currentAnswer =
+    currentQuestion
+      ? answers[
+          currentQuestion.id
+        ]
+      : undefined;
 
-  const previousQuestion =
-    useCallback(() => {
-      setCurrentIndex(
-        (index) =>
-          Math.max(
-            0,
-            index - 1
-          )
-      );
-    }, []);
+  /* =======================================================================
+     RESULT ROUTE
+  ======================================================================= */
 
-  /* ==========================================================
-     RESULT RESTORE
-  ========================================================== */
-
-  useEffect(() => {
-    if (!isResultRoute) {
-      return;
-    }
-
-    const saved =
+  if (
+    screen ===
+    "result"
+  ) {
+    const finalResult =
+      result ||
       readResult();
 
-    if (!saved) {
-      if (companyId) {
-        navigate(
-          `/technical-lab/${encodeURIComponent(
-            companyId
-          )}/levels`,
-          { replace: true }
-        );
-      } else {
-        navigate(
-          "/technical-lab",
-          { replace: true }
-        );
-      }
+    if (!finalResult) {
+      return (
+        <div className="technical-page">
+          <style>
+            {TECHNICAL_CSS}
+          </style>
 
-      return;
+          <LoadingBlock
+            text="Loading assessment result..."
+          />
+        </div>
+      );
     }
 
-    setResult(saved);
-
-    const resultCompanyId =
-      normalizeId(
-        firstValue(
-          saved?.companyId,
-          companyId
-        )
-      );
-
-    const fallback =
-      getFallbackCompany(
-        resultCompanyId
-      );
-
-    const resultCompanyName =
-      firstValue(
-        saved?.companyName,
-        saved?.company?.name
-      );
-
-    setSelectedCompany({
-      ...fallback,
-      ...(resultCompanyName
-        ? {
-            name: String(
-              resultCompanyName
-            ),
-          }
-        : {}),
-    });
-
-    setScreen("result");
-  }, [
-    isResultRoute,
-    companyId,
-    navigate,
-  ]);
-
-  /* ==========================================================
-     RETAKE
-  ========================================================== */
-
-  const retake =
-    useCallback(() => {
-      const level =
-        levels.find(
-          (item) =>
-            safeNumber(
-              firstValue(
-                item?.level,
-                item?.levelNumber
-              )
-            ) ===
-            levelNumber
-        );
-
-      if (level) {
-        startLevel(level);
-      } else {
-        goLevels(
-          company?.id
-        );
-      }
-    }, [
-      levels,
-      levelNumber,
-      startLevel,
-      goLevels,
-      company?.id,
-    ]);
-
-  /* ==========================================================
-     COMPANIES SCREEN
-  ========================================================== */
-
-  if (screen === "companies") {
     return (
-      <>
+      <ResultScreen
+        result={
+          finalResult
+        }
+        company={
+          company
+        }
+        selectedLevel={
+          selectedLevel
+        }
+        onRetake={() => {
+          const level =
+            levels.find(
+              (item) =>
+                safeNumber(
+                  item?.level
+                ) ===
+                safeNumber(
+                  selectedLevel
+                )
+            );
+
+          if (level) {
+            startLevel(
+              level
+            );
+          } else {
+            goLevels(
+              company?.id
+            );
+          }
+        }}
+        onLevels={() =>
+          goLevels(
+            company?.id
+          )
+        }
+        onCompanies={
+          goCompanies
+        }
+      />
+    );
+  }
+
+  /* =======================================================================
+     COMPANIES
+  ======================================================================= */
+
+  if (
+    screen ===
+    "companies"
+  ) {
+    return (
+      <div className="technical-page">
         <style>
           {TECHNICAL_CSS}
         </style>
 
-        <div className="technical-page">
-          <TechnicalHeader
-            title="Technical Lab"
-            subtitle="Company-specific engineering assessments"
-            onBack={() =>
-              navigate(
-                "/dashboard"
-              )
-            }
-          />
+        <NormalTopBar
+          title="Technical Lab"
+          onBack={() =>
+            navigate(
+              "/dashboard",
+              {
+                replace: true,
+              }
+            )
+          }
+        />
 
-          <main className="technical-container">
-            <section className="hero-block">
-              <div>
-                <span className="technical-eyebrow">
-                  ENGINEERING /
-                  TECHNICAL
-                </span>
+        <main className="technical-container">
+          <section className="lab-hero">
+            <div>
+              <span className="eyebrow">
+                ENGVIVA / TECHNICAL
+              </span>
 
-                <h1>
-                  Train for the
-                  companies you want.
-                </h1>
+              <h1>
+                Technical Lab
+              </h1>
 
-                <p>
-                  Choose a company,
-                  select a technical
-                  level and enter a
-                  server-evaluated
-                  proctored assessment.
-                </p>
-              </div>
+              <p>
+                Select a company to
+                open its technical
+                assessment levels.
+              </p>
+            </div>
 
-              <div className="hero-stat">
-                <strong>
-                  {companies.length}
-                </strong>
+            <div className="hero-stat">
+              <strong>
+                {
+                  companies.length
+                }
+              </strong>
 
-                <span>
-                  COMPANIES
-                </span>
-              </div>
-            </section>
+              <span>
+                COMPANIES
+              </span>
+            </div>
+          </section>
 
+          {error && (
+            <ErrorBanner
+              message={error}
+              onRetry={() =>
+                loadCompanies()
+              }
+            />
+          )}
+
+          {companiesLoading ? (
+            <LoadingBlock
+              text="Loading companies..."
+            />
+          ) : (
             <section>
               <div className="section-heading">
                 <div>
                   <span>
-                    COMPANY TRAINING
+                    COMPANY PREPARATION
                   </span>
 
                   <h2>
-                    Select a company
+                    Choose your target
                   </h2>
                 </div>
 
                 <span>
-                  TECHNICAL ROUND
+                  SERVER DATA
                 </span>
               </div>
 
-              {companiesLoading ? (
-                <LoadingBlock text="Loading companies..." />
-              ) : (
-                <div className="company-grid">
-                  {companies.map(
-                    (item) => (
-                      <CompanyCard
-                        key={item.id}
-                        company={item}
-                        onClick={() =>
-                          chooseCompany(
-                            item
-                          )
-                        }
-                      />
-                    )
-                  )}
-                </div>
-              )}
+              <div className="company-grid">
+                {companies.map(
+                  (
+                    item
+                  ) => (
+                    <CompanyCard
+                      key={
+                        item.id
+                      }
+                      company={
+                        item
+                      }
+                      onClick={() =>
+                        goLevels(
+                          item.id
+                        )
+                      }
+                    />
+                  )
+                )}
+              </div>
             </section>
-          </main>
-        </div>
-      </>
+          )}
+        </main>
+      </div>
     );
   }
 
-  /* ==========================================================
-     LEVELS SCREEN
-  ========================================================== */
+  /* =======================================================================
+     LEVELS
+  ======================================================================= */
 
-  if (screen === "levels") {
+  if (
+    screen ===
+    "levels"
+  ) {
     return (
-      <>
+      <div className="technical-page">
         <style>
           {TECHNICAL_CSS}
         </style>
 
-        <div className="technical-page">
-          <TechnicalHeader
-            title={
-              company?.name ||
-              "Technical Lab"
-            }
-            subtitle="Technical assessment levels"
-            onBack={
-              goCompanies
-            }
-          />
+        <NormalTopBar
+          title={
+            company?.name ||
+            "Company"
+          }
+          onBack={() =>
+            goCompanies()
+          }
+        />
 
-          <main className="technical-container">
-            <section className="company-hero">
-              <CompanyLogo
-                company={company}
-                large
-              />
+        <main className="technical-container">
+          <section className="company-hero">
+            <CompanyLogo
+              company={
+                company
+              }
+              large
+            />
 
-              <div className="company-hero-copy">
-                <span>
-                  {company?.category ||
-                    "ENGINEERING"}
-                </span>
-
-                <h1>
-                  {company?.name ||
-                    "Company"}
-                </h1>
-
-                <p>
-                  Technical
-                  assessment
-                  progression
-                </p>
-              </div>
-
-              <div className="company-level-count">
-                <strong>
-                  {levels.length ||
-                    "—"}
-                </strong>
-
-                <span>
-                  LEVELS
-                </span>
-              </div>
-            </section>
-
-            {error && (
-              <ErrorBanner
-                message={error}
-                onRetry={() =>
-                  loadLevels(
-                    company?.id
-                  )
-                }
-              />
-            )}
-
-            {levelsLoading ? (
-              <LoadingBlock text="Loading technical levels..." />
-            ) : (
-              <section className="levels-section">
-                <div className="section-heading">
-                  <div>
-                    <span>
-                      {(
-                        company?.name ||
-                        "COMPANY"
-                      ).toUpperCase()}
-                    </span>
-
-                    <h2>
-                      Technical levels
-                    </h2>
-                  </div>
-
-                  <span>
-                    {levels.length}{" "}
-                    AVAILABLE
-                  </span>
-                </div>
-
-                <div className="level-list">
-                  {levels.map(
-                    (
-                      level,
-                      index
-                    ) => {
-                      const number =
-                        safeNumber(
-                          firstValue(
-                            level?.level,
-                            level?.levelNumber
-                          ),
-                          index + 1
-                        );
-
-                      return (
-                        <button
-                          key={`${company?.id}-${number}`}
-                          className="level-card"
-                          onClick={() =>
-                            startLevel(
-                              level
-                            )
-                          }
-                          disabled={
-                            loadingTest
-                          }
-                        >
-                          <div className="level-number">
-                            {String(
-                              number
-                            ).padStart(
-                              2,
-                              "0"
-                            )}
-                          </div>
-
-                          <div className="level-main">
-                            <span>
-                              {firstValue(
-                                level?.difficulty,
-                                "Technical"
-                              )}
-                            </span>
-
-                            <h3>
-                              {firstValue(
-                                level?.title,
-                                level?.name,
-                                `Technical Level ${number}`
-                              )}
-                            </h3>
-
-                            <p>
-                              {safeNumber(
-                                level?.questionCount
-                              )}{" "}
-                              questions
-                              {" · "}
-                              {safeNumber(
-                                level?.moduleCount,
-                                Array.isArray(
-                                  level?.modules
-                                )
-                                  ? level
-                                      .modules
-                                      .length
-                                  : 0
-                              )}{" "}
-                              modules
-                            </p>
-                          </div>
-
-                          <div className="level-meta">
-                            <strong>
-                              {safeNumber(
-                                level?.questionCount
-                              )}
-                            </strong>
-
-                            <span>
-                              QUESTIONS
-                            </span>
-                          </div>
-
-                          <div className="level-arrow">
-                            →
-                          </div>
-                        </button>
-                      );
-                    }
-                  )}
-                </div>
-              </section>
-            )}
-          </main>
-
-          {loadingTest && (
-            <FullscreenLoader text="Preparing your proctored technical assessment..." />
-          )}
-        </div>
-      </>
-    );
-  }
-
-  /* ==========================================================
-     RESULT SCREEN
-  ========================================================== */
-
-  if (
-    screen === "result"
-  ) {
-    const score = safeNumber(
-      firstValue(
-        result?.percentage,
-        result?.score,
-        result?.overallScore
-      )
-    );
-
-    return (
-      <>
-        <style>
-          {RESULT_CSS}
-        </style>
-
-        <div className="technical-result">
-          <div className="result-wrap">
-            <div className="result-company">
-              <CompanyLogo
-                company={company}
-                large
-              />
-
-              <div>
-                <span>
-                  {company?.name}
-                </span>
-
-                <strong>
-                  Technical Assessment
-                </strong>
-              </div>
-            </div>
-
-            <div className="result-heading">
+            <div className="company-hero-copy">
               <span>
-                LEVEL{" "}
-                {levelNumber}{" "}
-                COMPLETE
+                {company?.category ||
+                  "TECHNOLOGY"}
               </span>
 
               <h1>
-                Technical
-                performance.
+                {company?.name ||
+                  "Company"}
               </h1>
 
               <p>
-                Your attempt has
-                been evaluated by
-                the server and saved.
+                Select a technical
+                assessment level.
+                Every question is
+                loaded from the
+                server-side technical
+                dataset.
               </p>
             </div>
 
-            <div className="result-score-card">
-              <div
-                className="score-ring"
-                style={{
-                  "--score": `${Math.min(
-                    100,
-                    Math.max(
-                      0,
-                      score
-                    )
-                  )}%`,
-                }}
-              >
+            <div className="company-level-count">
+              <strong>
+                {
+                  levels.length
+                }
+              </strong>
+
+              <span>
+                LEVELS
+              </span>
+            </div>
+          </section>
+
+          {error && (
+            <ErrorBanner
+              message={error}
+              onRetry={() =>
+                loadLevels(
+                  companyId
+                )
+              }
+            />
+          )}
+
+          {levelsLoading ? (
+            <LoadingBlock
+              text="Loading technical levels..."
+            />
+          ) : (
+            <section>
+              <div className="section-heading">
                 <div>
-                  <strong>
-                    {score}
-                  </strong>
-
                   <span>
-                    /100
-                  </span>
-                </div>
-              </div>
-
-              <div className="score-copy">
-                <span>
-                  OVERALL SCORE
-                </span>
-
-                <h2>
-                  {getVerdict(
-                    score
-                  )}
-                </h2>
-
-                <p>
-                  {safeNumber(
-                    result?.correctAnswers
-                  )}{" "}
-                  correct out of{" "}
-                  {safeNumber(
-                    result?.totalQuestions
-                  )}{" "}
-                  questions.
-                </p>
-              </div>
-            </div>
-
-            <div className="result-metrics">
-              <ResultMetric
-                label="SCORE"
-                value={`${score}%`}
-              />
-
-              <ResultMetric
-                label="ACCURACY"
-                value={`${safeNumber(
-                  result?.accuracy,
-                  score
-                )}%`}
-              />
-
-              <ResultMetric
-                label="CORRECT"
-                value={safeNumber(
-                  result?.correctAnswers
-                )}
-              />
-
-              <ResultMetric
-                label="ANSWERED"
-                value={safeNumber(
-                  result?.answeredQuestions
-                )}
-              />
-            </div>
-
-            <section className="module-analysis">
-              <div className="result-section-heading">
-                <span>
-                  TECHNICAL ANALYSIS
-                </span>
-
-                <h2>
-                  Module performance
-                </h2>
-              </div>
-
-              {Array.isArray(
-                result?.moduleBreakdown
-              ) &&
-              result
-                .moduleBreakdown
-                .length ? (
-                <div className="module-list">
-                  {result.moduleBreakdown.map(
-                    (
-                      item,
-                      index
-                    ) => {
-                      const moduleScore =
-                        safeNumber(
-                          item?.score
-                        );
-
-                      return (
-                        <div
-                          className="module-row"
-                          key={`${item?.moduleId || item?.module || "module"}-${index}`}
-                        >
-                          <div>
-                            <strong>
-                              {firstValue(
-                                item?.module,
-                                item?.moduleId,
-                                "Technical"
-                              )}
-                            </strong>
-
-                            <span>
-                              {safeNumber(
-                                item?.correct
-                              )}{" "}
-                              /{" "}
-                              {safeNumber(
-                                item?.total
-                              )}{" "}
-                              correct
-                            </span>
-                          </div>
-
-                          <div className="module-progress">
-                            <i
-                              style={{
-                                width: `${Math.min(
-                                  100,
-                                  Math.max(
-                                    0,
-                                    moduleScore
-                                  )
-                                )}%`,
-                              }}
-                            />
-                          </div>
-
-                          <strong>
-                            {moduleScore}%
-                          </strong>
-                        </div>
-                      );
+                    {
+                      company?.name
                     }
-                  )}
-                </div>
-              ) : (
-                <div className="no-analysis">
-                  Server module analysis
-                  was not returned for
-                  this attempt.
-                </div>
-              )}
-            </section>
+                  </span>
 
-            {violations.length >
-              0 && (
-              <div className="result-note">
-                <span>!</span>
+                  <h2>
+                    Technical levels
+                  </h2>
+                </div>
 
-                <p>
-                  <strong>
-                    Proctoring:
-                  </strong>{" "}
-                  {
-                    violations.length
-                  }{" "}
-                  browser flag(s)
-                  were recorded.
-                </p>
+                <span>
+                  SERVER EVALUATED
+                </span>
               </div>
-            )}
 
-            {error && (
-              <ErrorBanner
-                message={error}
-                onRetry={() =>
-                  setError("")
-                }
-              />
-            )}
+              <div className="levels-grid">
+                {levels.map(
+                  (
+                    level
+                  ) => {
+                    const number =
+                      safeNumber(
+                        level?.level
+                      );
 
-            <div className="result-actions">
-              <button
-                className="result-secondary"
-                onClick={retake}
-              >
-                RETAKE LEVEL
-              </button>
+                    return (
+                      <button
+                        key={`${companyId}-${number}`}
+                        className="level-card"
+                        disabled={
+                          loadingTest
+                        }
+                        onClick={() =>
+                          startLevel(
+                            level
+                          )
+                        }
+                      >
+                        <span className="level-number">
+                          LEVEL{" "}
+                          {
+                            number
+                          }
+                        </span>
 
-              <button
-                className="result-primary"
-                onClick={() =>
-                  navigate(
-                    "/dashboard"
-                  )
-                }
-              >
-                VIEW DASHBOARD →
-              </button>
-            </div>
-          </div>
-        </div>
-      </>
+                        <h3>
+                          {
+                            level?.title
+                          }
+                        </h3>
+
+                        <p>
+                          {level?.description ||
+                            "Server-generated technical assessment using the configured company question pool."}
+                        </p>
+
+                        <div className="level-meta">
+                          <span className="level-pill">
+                            {
+                              level?.difficulty
+                            }
+                          </span>
+
+                          {safeNumber(
+                            level?.questionCount
+                          ) >
+                            0 && (
+                            <span className="level-pill">
+                              {
+                                level.questionCount
+                              }{" "}
+                              QUESTIONS
+                            </span>
+                          )}
+
+                          {safeNumber(
+                            level?.estimatedMinutes
+                          ) >
+                            0 && (
+                            <span className="level-pill">
+                              {
+                                level.estimatedMinutes
+                              }{" "}
+                              MIN
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="level-arrow">
+                          →
+                        </span>
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
     );
   }
 
-  /* ==========================================================
-     TEST SCREEN
-  ========================================================== */
+  /* =======================================================================
+     RUNNING TEST
+  ======================================================================= */
 
   if (
-    !currentQuestion
+    screen ===
+    "running"
   ) {
+    if (
+      !questions.length
+    ) {
+      return (
+        <div className="technical-page">
+          <style>
+            {TECHNICAL_CSS}
+          </style>
+
+          <LoadingBlock
+            text="Loading technical assessment..."
+          />
+        </div>
+      );
+    }
+
     return (
-      <>
+      <div className="technical-test">
         <style>
           {TECHNICAL_CSS}
         </style>
 
-        <FullscreenLoader text="Loading technical assessment..." />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <style>
-        {TECHNICAL_TEST_CSS}
-      </style>
-
-      <div className="technical-test proctor-shell">
-        <header className="testbar">
-          <div className="testbar-brand">
+        <header className="test-header">
+          <div className="test-brand">
             <CompanyLogo
-              company={company}
+              company={
+                company
+              }
             />
 
             <div>
               <strong>
-                {company?.name}
+                ENGVIVA
               </strong>
 
               <span>
-                Technical · Level{" "}
-                {levelNumber}
+                {
+                  company?.name
+                }{" "}
+                · LEVEL{" "}
+                {
+                  selectedLevel
+                }
               </span>
             </div>
+          </div>
 
-            <span className="proctor-badge">
-              <i className="proctor-dot" />
+          <div className="test-status">
+            <span>
               PROCTORED
             </span>
-          </div>
 
-          <div className="testbar-center">
-            <span>
-              QUESTION{" "}
-              {currentIndex + 1}{" "}
-              / {questions.length}
-            </span>
-
-            <div className="top-progress">
-              <i
-                style={{
-                  width: `${progress}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          <div
-            className={
-              remainingSeconds <= 60
-                ? "test-timer danger"
-                : "test-timer"
-            }
-          >
-            <span>
-              TIME LEFT
-            </span>
-
-            <strong>
+            <strong
+              className={
+                remainingSeconds <
+                60
+                  ? "timer-danger"
+                  : ""
+              }
+            >
               {formatTime(
                 remainingSeconds
               )}
             </strong>
 
-            <small className="proctor-count">
-              {violations.length}/
+            <small>
+              {
+                violations.length
+              }
+              /
               {
                 MAX_PROCTOR_FLAGS
               }{" "}
@@ -3052,20 +2863,35 @@ export default function TechnicalAssessment() {
           </div>
         </header>
 
-        <div className="test-body">
-          <aside className="test-sidebar">
-            <div className="sidebar-top">
+        <main className="test-container">
+          <aside className="question-sidebar">
+            <div className="sidebar-heading">
               <span>
                 QUESTIONS
               </span>
 
               <strong>
-                {answeredCount}/
-                {questions.length}
+                {
+                  answeredCount
+                }
+                /
+                {
+                  questions.length
+                }
               </strong>
             </div>
 
-            <div className="question-palette">
+            <div className="progress-track">
+              <div
+                className="progress-fill"
+                style={{
+                  width:
+                    `${progress}%`,
+                }}
+              />
+            </div>
+
+            <div className="question-grid">
               {questions.map(
                 (
                   question,
@@ -3075,158 +2901,133 @@ export default function TechnicalAssessment() {
                     key={
                       question.id
                     }
-                    className={[
+                    className={`question-jump ${
                       index ===
                       currentIndex
                         ? "active"
-                        : "",
+                        : ""
+                    } ${
                       answers[
                         question.id
-                      ] !== undefined
+                      ] !==
+                      undefined
                         ? "answered"
-                        : "",
-                    ].join(" ")}
+                        : ""
+                    }`}
                     onClick={() =>
                       setCurrentIndex(
                         index
                       )
                     }
+                    disabled={
+                      submitting ||
+                      proctorLocked
+                    }
                   >
-                    {String(
+                    {
                       index + 1
-                    ).padStart(
-                      2,
-                      "0"
-                    )}
+                    }
                   </button>
                 )
               )}
             </div>
 
-            <div className="sidebar-bottom">
-              <span>
-                PROGRESS
-              </span>
-
+            <div className="sidebar-note">
               <strong>
-                {progress}%
+                SECURE TEST
               </strong>
 
-              <div>
-                <i
-                  style={{
-                    width: `${progress}%`,
-                  }}
-                />
-              </div>
+              <p>
+                Remain in fullscreen.
+                Do not switch tabs or
+                leave the assessment
+                window.
+              </p>
             </div>
           </aside>
 
-          <main className="test-question-area">
+          <section className="question-panel">
             <div className="question-meta">
               <span>
-                {currentQuestion.module}
+                QUESTION{" "}
+                {
+                  currentIndex +
+                  1
+                }{" "}
+                /{" "}
+                {
+                  questions.length
+                }
               </span>
 
               <span>
-                {currentQuestion.difficulty}
+                {
+                  currentQuestion?.module ||
+                  "Technical"
+                }
               </span>
             </div>
 
-            <div className="question-container">
-              <div className="question-index">
-                {String(
-                  currentIndex + 1
-                ).padStart(
-                  2,
-                  "0"
-                )}
-              </div>
+            <div className="question-content">
+              <MarkdownText>
+                {
+                  currentQuestion?.questionMarkdown ||
+                  currentQuestion?.question
+                }
+              </MarkdownText>
 
-              <h1>
-                {currentQuestion.question}
-              </h1>
+              <QuestionImages
+                question={
+                  currentQuestion
+                }
+              />
 
-              {currentQuestion
-                .images?.length >
-                0 && (
-                <div className="question-images">
-                  {currentQuestion.images.map(
-                    (
-                      image,
-                      index
-                    ) => {
-                      const source =
-                        typeof image ===
-                        "string"
-                          ? image
-                          : image?.source ||
-                            image?.url;
-
-                      if (!source) {
-                        return null;
-                      }
-
-                      return (
-                        <img
-                          key={`${currentQuestion.id}-image-${index}`}
-                          src={source}
-                          alt={
-                            typeof image ===
-                            "object"
-                              ? image?.alt ||
-                                "Question illustration"
-                              : "Question illustration"
-                          }
-                          onError={(
-                            event
-                          ) => {
-                            event.currentTarget.style.display =
-                              "none";
-                          }}
-                        />
-                      );
-                    }
-                  )}
-                </div>
-              )}
-
-              <div className="answer-options">
-                {currentQuestion.options.map(
+              <div className="options-list">
+                {currentQuestion?.options?.map(
                   (
                     option,
                     index
                   ) => {
                     const selected =
-                      currentAnswer ===
-                      index;
+                      String(
+                        currentAnswer
+                      ) ===
+                      String(
+                        index
+                      );
 
                     return (
                       <button
                         key={`${currentQuestion.id}-${index}`}
-                        className={
+                        className={`option-card ${
                           selected
                             ? "selected"
                             : ""
-                        }
-                        disabled={
-                          proctorLocked
-                        }
+                        }`}
                         onClick={() =>
                           chooseAnswer(
                             currentQuestion.id,
                             index
                           )
                         }
+                        disabled={
+                          proctorLocked ||
+                          submitting
+                        }
                       >
                         <span className="option-letter">
                           {String.fromCharCode(
-                            65 + index
+                            65 +
+                              index
                           )}
                         </span>
 
                         <span className="option-text">
-                          {option}
+                          <MarkdownText>
+                            {
+                              option
+                            }
+                          </MarkdownText>
                         </span>
 
                         <span className="option-check">
@@ -3241,47 +3042,67 @@ export default function TechnicalAssessment() {
               </div>
             </div>
 
-            <div className="test-navigation">
+            <div className="question-footer">
               <button
-                className="nav-secondary"
+                className="secondary-button"
                 disabled={
                   currentIndex ===
                     0 ||
-                  proctorLocked
+                  submitting
                 }
-                onClick={
-                  previousQuestion
+                onClick={() =>
+                  setCurrentIndex(
+                    (
+                      value
+                    ) =>
+                      Math.max(
+                        0,
+                        value - 1
+                      )
+                  )
                 }
               >
                 ← PREVIOUS
               </button>
 
-              <div className="nav-status">
-                {currentAnswer !==
-                undefined
-                  ? "ANSWER SAVED"
-                  : "SELECT AN ANSWER"}
+              <div className="footer-progress">
+                {
+                  currentIndex +
+                  1
+                }{" "}
+                /{" "}
+                {
+                  questions.length
+                }
               </div>
 
               {currentIndex <
               questions.length -
                 1 ? (
                 <button
-                  className="nav-primary"
+                  className="primary-button"
                   disabled={
-                    proctorLocked
+                    submitting
                   }
-                  onClick={
-                    nextQuestion
+                  onClick={() =>
+                    setCurrentIndex(
+                      (
+                        value
+                      ) =>
+                        Math.min(
+                          questions.length -
+                            1,
+                          value + 1
+                        )
+                    )
                   }
                 >
                   NEXT →
                 </button>
               ) : (
                 <button
-                  className="nav-submit"
+                  className="primary-button"
                   disabled={
-                    proctorLocked ||
                     submitting
                   }
                   onClick={() =>
@@ -3294,8 +3115,8 @@ export default function TechnicalAssessment() {
                 </button>
               )}
             </div>
-          </main>
-        </div>
+          </section>
+        </main>
 
         {proctorWarning &&
           !proctorLocked && (
@@ -3305,7 +3126,9 @@ export default function TechnicalAssessment() {
               </strong>
 
               <span>
-                {proctorWarning}
+                {
+                  proctorWarning
+                }
               </span>
             </div>
           )}
@@ -3326,11 +3149,12 @@ export default function TechnicalAssessment() {
               </h2>
 
               <p>
-                The browser detected
-                repeated restricted
-                activity. Your attempt
-                is being submitted with
-                the proctoring audit.
+                The maximum number
+                of proctoring
+                violations was
+                reached. The attempt
+                is being submitted
+                with its audit.
               </p>
             </div>
           </div>
@@ -3368,13 +3192,87 @@ export default function TechnicalAssessment() {
           />
         )}
       </div>
-    </>
+    );
+  }
+
+  return (
+    <div className="technical-page">
+      <style>
+        {TECHNICAL_CSS}
+      </style>
+
+      <LoadingBlock
+        text="Loading Technical Lab..."
+      />
+    </div>
   );
 }
 
-/* ============================================================
-   COMPONENTS
-============================================================ */
+/* =========================================================================
+   COMPANY LOGO
+========================================================================= */
+
+function CompanyLogo({
+  company,
+  large = false,
+}) {
+  const domain =
+    safeString(
+      company?.domain
+    )
+      .replace(
+        /^https?:\/\//i,
+        ""
+      )
+      .replace(
+        /^www\./i,
+        ""
+      )
+      .split("/")[0];
+
+  const favicon =
+    domain
+      ? `https://www.google.com/s2/favicons?domain=${domain}&sz=256`
+      : "";
+
+  return (
+    <div
+      className={`company-logo ${
+        large
+          ? "company-logo-large"
+          : ""
+      }`}
+    >
+      {favicon ? (
+        <img
+          src={favicon}
+          alt={
+            company?.name ||
+            ""
+          }
+          onError={(
+            event
+          ) => {
+            event.currentTarget.style.display =
+              "none";
+          }}
+        />
+      ) : (
+        <span>
+          {safeString(
+            company?.name
+          )
+            .charAt(0)
+            .toUpperCase()}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   COMPANY CARD
+========================================================================= */
 
 function CompanyCard({
   company,
@@ -3383,23 +3281,35 @@ function CompanyCard({
   return (
     <button
       className="company-card"
-      onClick={onClick}
+      onClick={
+        onClick
+      }
     >
       <CompanyLogo
-        company={company}
+        company={
+          company
+        }
       />
 
       <div className="company-card-info">
         <span>
-          {company.category}
+          {
+            company?.category ||
+            "TECHNOLOGY"
+          }
         </span>
 
         <h3>
-          {company.name}
+          {
+            company?.name
+          }
         </h3>
 
         <p>
-          Technical training
+          {
+            company?.description ||
+            "Technical assessment preparation"
+          }
         </p>
       </div>
 
@@ -3410,130 +3320,382 @@ function CompanyCard({
   );
 }
 
-function CompanyLogo({
-  company,
-  large = false,
+/* =========================================================================
+   QUESTION IMAGES
+========================================================================= */
+
+function QuestionImages({
+  question,
 }) {
-  const [failed, setFailed] =
-    useState(false);
-
-  const domain =
-    company?.domain ||
-    getFallbackCompany(
-      company?.id
-    ).domain;
-
-  const favicon =
-    getFavicon(domain);
+  if (
+    !Array.isArray(
+      question?.images
+    ) ||
+    !question.images.length
+  ) {
+    return null;
+  }
 
   return (
-    <div
-      className={
-        large
-          ? "company-logo large"
-          : "company-logo"
-      }
-    >
-      {!failed && favicon ? (
-        <img
-          src={favicon}
-          alt={
-            company?.name ||
-            "Company"
+    <div className="question-images">
+      {question.images.map(
+        (
+          image,
+          index
+        ) => {
+          const source =
+            safeString(
+              image?.url ||
+              image?.src ||
+              image?.source
+            );
+
+          if (!source) {
+            return null;
           }
-          onError={() =>
-            setFailed(true)
-          }
-        />
-      ) : (
-        <span>
-          {String(
-            company?.name ||
-              "E"
-          )
-            .trim()
-            .charAt(0)
-            .toUpperCase()}
-        </span>
+
+          /*
+           * Backend may return a
+           * relative image path.
+           *
+           * Keep absolute URLs as-is.
+           */
+
+          const src =
+            /^https?:\/\//i.test(
+              source
+            )
+              ? source
+              : `${API_BASE}/${source.replace(
+                  /^\/+/,
+                  ""
+                )}`;
+
+          return (
+            <figure
+              key={
+                `${source}-${index}`
+              }
+            >
+              <img
+                src={src}
+                alt={
+                  image?.alt ||
+                  "Question diagram"
+                }
+                loading="lazy"
+              />
+            </figure>
+          );
+        }
       )}
     </div>
   );
 }
 
-function TechnicalHeader({
+/* =========================================================================
+   RESULT SCREEN
+========================================================================= */
+
+function ResultScreen({
+  result,
+  company,
+  selectedLevel,
+  onRetake,
+  onLevels,
+  onCompanies,
+}) {
+  const score =
+    clamp(
+      firstValue(
+        result?.percentage,
+        result?.score
+      ),
+      0,
+      100
+    );
+
+  const total =
+    safeNumber(
+      result?.totalQuestions,
+      0
+    );
+
+  const correct =
+    safeNumber(
+      result?.correctAnswers,
+      0
+    );
+
+  const incorrect =
+    safeNumber(
+      result?.incorrectAnswers,
+      0
+    );
+
+  const answered =
+    safeNumber(
+      result?.answeredQuestions,
+      correct +
+        incorrect
+    );
+
+  const unanswered =
+    safeNumber(
+      result?.unansweredQuestions,
+      Math.max(
+        0,
+        total -
+          answered
+      )
+    );
+
+  const performance =
+    firstValue(
+      result?.performance,
+      score >= 90
+        ? "Exceptional"
+        : score >= 80
+        ? "Excellent"
+        : score >= 70
+        ? "Strong"
+        : score >= 60
+        ? "Good"
+        : score >= 50
+        ? "Developing"
+        : "Needs Improvement"
+    );
+
+  return (
+    <div className="technical-page">
+      <style>
+        {TECHNICAL_CSS}
+      </style>
+
+      <main className="result-container">
+        <div className="result-header">
+          <div>
+            <span className="eyebrow">
+              TECHNICAL ASSESSMENT
+            </span>
+
+            <h1>
+              Assessment complete.
+            </h1>
+
+            <p>
+              {
+                company?.name
+              }{" "}
+              · LEVEL{" "}
+              {
+                selectedLevel
+              }
+            </p>
+          </div>
+
+          <div className="completed-badge">
+            ✓ COMPLETED
+          </div>
+        </div>
+
+        <section className="score-hero">
+          <div className="score-circle">
+            <strong>
+              {
+                score
+              }
+              %
+            </strong>
+
+            <span>
+              SCORE
+            </span>
+          </div>
+
+          <div className="score-copy">
+            <span>
+              PERFORMANCE
+            </span>
+
+            <h2>
+              {
+                performance
+              }
+            </h2>
+
+            <p>
+              Your result was
+              evaluated securely
+              by the ENGVIVA
+              technical scoring
+              engine.
+            </p>
+          </div>
+        </section>
+
+        <section className="result-stats">
+          <ResultStat
+            value={
+              total
+            }
+            label="TOTAL"
+          />
+
+          <ResultStat
+            value={
+              answered
+            }
+            label="ANSWERED"
+          />
+
+          <ResultStat
+            value={
+              correct
+            }
+            label="CORRECT"
+          />
+
+          <ResultStat
+            value={
+              incorrect
+            }
+            label="INCORRECT"
+          />
+
+          <ResultStat
+            value={
+              unanswered
+            }
+            label="UNANSWERED"
+          />
+        </section>
+
+        {Array.isArray(
+          result?.moduleBreakdown
+        ) &&
+          result.moduleBreakdown
+            .length > 0 && (
+            <section className="breakdown-section">
+              <div className="section-heading">
+                <div>
+                  <span>
+                    ANALYSIS
+                  </span>
+
+                  <h2>
+                    Module performance
+                  </h2>
+                </div>
+              </div>
+
+              <div className="breakdown-grid">
+                {result.moduleBreakdown.map(
+                  (
+                    item
+                  ) => (
+                    <div
+                      className="breakdown-card"
+                      key={
+                        item.moduleId
+                      }
+                    >
+                      <div>
+                        <strong>
+                          {
+                            item.module
+                          }
+                        </strong>
+
+                        <span>
+                          {
+                            item.correct
+                          }
+                          /
+                          {
+                            item.total
+                          }{" "}
+                          correct
+                        </span>
+                      </div>
+
+                      <strong>
+                        {
+                          item.score
+                        }
+                        %
+                      </strong>
+                    </div>
+                  )
+                )}
+              </div>
+            </section>
+          )}
+
+        <div className="result-actions">
+          <button
+            className="secondary-button"
+            onClick={
+              onCompanies
+            }
+          >
+            ALL COMPANIES
+          </button>
+
+          <button
+            className="secondary-button"
+            onClick={
+              onLevels
+            }
+          >
+            LEVELS
+          </button>
+
+          <button
+            className="primary-button"
+            onClick={
+              onRetake
+            }
+          >
+            RETAKE LEVEL →
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* =========================================================================
+   UI HELPERS
+========================================================================= */
+
+function NormalTopBar({
   title,
-  subtitle,
   onBack,
 }) {
   return (
-    <header className="technical-header">
+    <header className="normal-topbar">
       <button
-        className="header-back"
-        onClick={onBack}
-        aria-label="Back"
+        className="topbar-back"
+        onClick={
+          onBack
+        }
       >
         ←
       </button>
 
-      <div className="header-brand">
-        <div className="engviva-mark">
-          E
-        </div>
-
-        <div>
-          <strong>
-            ENGVIVA
-          </strong>
-
-          <span>
-            TECHNICAL LAB
-          </span>
-        </div>
-      </div>
-
-      <div className="header-title">
+      <div>
         <strong>
-          {title}
+          ENGVIVA
         </strong>
 
         <span>
-          {subtitle}
+          {
+            title
+          }
         </span>
       </div>
     </header>
-  );
-}
-
-function LoadingBlock({
-  text,
-}) {
-  return (
-    <div className="loading-block">
-      <div className="spinner" />
-      <span>
-        {text}
-      </span>
-    </div>
-  );
-}
-
-function FullscreenLoader({
-  text,
-}) {
-  return (
-    <div className="fullscreen-loader">
-      <div>
-        <div className="spinner" />
-
-        <strong>
-          {text}
-        </strong>
-
-        <span>
-          Loading securely...
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -3545,19 +3707,62 @@ function ErrorBanner({
     <div className="error-banner">
       <div>
         <strong>
-          Unable to continue
+          Something went wrong
         </strong>
 
         <span>
-          {message}
+          {
+            message
+          }
         </span>
       </div>
 
-      <button
-        onClick={onRetry}
-      >
-        RETRY
-      </button>
+      {onRetry && (
+        <button
+          onClick={
+            onRetry
+          }
+        >
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+function LoadingBlock({
+  text,
+}) {
+  return (
+    <div className="loading-block">
+      <div className="spinner" />
+
+      <strong>
+        {
+          text
+        }
+      </strong>
+    </div>
+  );
+}
+
+function ResultStat({
+  value,
+  label,
+}) {
+  return (
+    <div className="result-stat">
+      <strong>
+        {
+          value
+        }
+      </strong>
+
+      <span>
+        {
+          label
+        }
+      </span>
     </div>
   );
 }
@@ -3574,28 +3779,30 @@ function SubmitModal({
     <div className="modal-backdrop">
       <div className="submit-modal">
         <div className="modal-symbol">
-          ✓
+          ?
         </div>
 
         <span>
-          FINAL SUBMISSION
+          FINISH ASSESSMENT
         </span>
 
         <h2>
-          Finish technical
-          test?
+          Submit your test?
         </h2>
 
         <p>
-          Your answers will be
-          sent to the server for
-          secure evaluation.
+          Your answers will
+          be sent to the ENGVIVA
+          backend and evaluated
+          securely.
         </p>
 
         <div className="modal-stats">
           <div>
             <strong>
-              {answered}
+              {
+                answered
+              }
             </strong>
 
             <span>
@@ -3605,7 +3812,9 @@ function SubmitModal({
 
           <div>
             <strong>
-              {unanswered}
+              {
+                unanswered
+              }
             </strong>
 
             <span>
@@ -3615,19 +3824,25 @@ function SubmitModal({
 
           <div>
             <strong>
-              {formatTime(time)}
+              {
+                formatTime(
+                  time
+                )
+              }
             </strong>
 
             <span>
-              TIME LEFT
+              REMAINING
             </span>
           </div>
         </div>
 
         <div className="modal-actions">
           <button
-            className="modal-cancel"
-            disabled={submitting}
+            className="secondary-button"
+            disabled={
+              submitting
+            }
             onClick={
               onCancel
             }
@@ -3636,13 +3851,17 @@ function SubmitModal({
           </button>
 
           <button
-            className="modal-confirm"
-            disabled={submitting}
-            onClick={onSubmit}
+            className="primary-button"
+            disabled={
+              submitting
+            }
+            onClick={
+              onSubmit
+            }
           >
             {submitting
               ? "SUBMITTING..."
-              : "SUBMIT TEST →"}
+              : "SUBMIT & ANALYSE →"}
           </button>
         </div>
       </div>
@@ -3650,471 +3869,339 @@ function SubmitModal({
   );
 }
 
-function ResultMetric({
-  label,
-  value,
-}) {
-  return (
-    <div className="result-metric">
-      <span>
-        {label}
-      </span>
-
-      <strong>
-        {value}
-      </strong>
-    </div>
-  );
-}
-
-function getVerdict(score) {
-  if (score >= 90)
-    return "Exceptional technical performance";
-
-  if (score >= 80)
-    return "Excellent technical performance";
-
-  if (score >= 70)
-    return "Strong technical performance";
-
-  if (score >= 50)
-    return "Developing technical performance";
-
-  return "Keep building your technical depth";
-}
-
-/* ============================================================
-   MAIN CSS
-============================================================ */
+/* =========================================================================
+   CSS
+========================================================================= */
 
 const TECHNICAL_CSS = `
 * {
   box-sizing: border-box;
 }
 
+.technical-page,
+.technical-test {
+  min-height: 100vh;
+  background: #080808;
+  color: #f4f4f4;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
 button {
   font: inherit;
 }
 
-.technical-page {
-  min-height: 100vh;
-  color: #f7f4fb;
-  background:
-    radial-gradient(circle at 80% 0%, rgba(159,110,255,.12), transparent 32%),
-    #07060b;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+.technical-container {
+  width: min(
+    1400px,
+    calc(100% - 48px)
+  );
+  margin: 0 auto;
+  padding: 42px 0 80px;
 }
 
-.technical-header {
+.normal-topbar {
   height: 76px;
-  padding: 0 28px;
+  border-bottom: 1px solid #202020;
   display: flex;
   align-items: center;
-  gap: 18px;
-  border-bottom: 1px solid rgba(255,255,255,.07);
-  background: rgba(7,6,11,.9);
-  backdrop-filter: blur(20px);
+  gap: 16px;
+  padding: 0 28px;
+  background: #0b0b0b;
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 50;
 }
 
-.header-back {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  border: 1px solid rgba(255,255,255,.08);
-  color: #aaa3b0;
-  background: rgba(255,255,255,.03);
+.normal-topbar strong {
+  display: block;
+  font-size: 14px;
+  letter-spacing: .14em;
+}
+
+.normal-topbar span {
+  display: block;
+  color: #777;
+  font-size: 11px;
+  margin-top: 3px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.topbar-back {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #292929;
+  background: #111;
+  color: white;
+  border-radius: 10px;
   cursor: pointer;
 }
 
-.header-brand {
+.lab-hero,
+.company-hero {
+  border: 1px solid #222;
+  border-radius: 24px;
+  background:
+    linear-gradient(
+      135deg,
+      #111,
+      #0a0a0a
+    );
+  padding: 42px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 28px;
+  margin-bottom: 44px;
 }
 
-.engviva-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg,#dbc8ff,#9e72df);
-  color: #160d20;
-  font-weight: 950;
-}
-
-.header-brand strong,
-.header-brand span,
-.header-title strong,
-.header-title span {
-  display: block;
-}
-
-.header-brand strong {
-  font-size: 12px;
-  letter-spacing: 1px;
-}
-
-.header-brand span {
-  color: #6d6675;
-  font-size: 7px;
-  letter-spacing: 1.4px;
-}
-
-.header-title {
-  margin-left: 20px;
-  padding-left: 20px;
-  border-left: 1px solid rgba(255,255,255,.07);
-}
-
-.header-title strong {
-  font-size: 12px;
-}
-
-.header-title span {
-  margin-top: 3px;
-  color: #716a78;
-  font-size: 9px;
-}
-
-.technical-container {
-  width: min(1250px,calc(100% - 48px));
-  margin: auto;
-  padding: 58px 0 90px;
-}
-
-.hero-block {
-  min-height: 300px;
-  display: flex;
-  align-items: flex-end;
+.lab-hero {
   justify-content: space-between;
-  gap: 30px;
-  padding-bottom: 50px;
 }
 
-.technical-eyebrow,
-.section-heading > div > span,
-.section-heading > span {
-  color: #9d81c8;
-  font-size: 9px;
-  font-weight: 950;
-  letter-spacing: 1.8px;
+.eyebrow,
+.company-hero-copy > span,
+.section-heading > div > span {
+  color: #a8a8a8;
+  font-size: 11px;
+  letter-spacing: .16em;
+  font-weight: 700;
 }
 
-.hero-block h1 {
-  max-width: 750px;
-  margin: 12px 0;
-  font-size: clamp(44px,6vw,78px);
-  line-height: .98;
-  letter-spacing: -4px;
+.lab-hero h1,
+.company-hero h1 {
+  font-size: clamp(
+    36px,
+    5vw,
+    72px
+  );
+  line-height: .95;
+  margin: 14px 0;
+  letter-spacing: -.055em;
 }
 
-.hero-block p {
-  max-width: 650px;
-  color: #827b89;
-  font-size: 14px;
-  line-height: 1.8;
+.lab-hero p,
+.company-hero p {
+  max-width: 720px;
+  color: #8b8b8b;
+  line-height: 1.7;
+  margin: 0;
 }
 
-.hero-stat {
-  min-width: 150px;
-  padding: 24px;
-  border-radius: 22px;
-  border: 1px solid rgba(255,255,255,.07);
-  background: rgba(255,255,255,.025);
+.hero-stat,
+.company-level-count {
+  min-width: 130px;
+  text-align: right;
 }
 
 .hero-stat strong,
-.hero-stat span {
+.company-level-count strong {
   display: block;
+  font-size: 54px;
+  line-height: 1;
 }
 
-.hero-stat strong {
-  font-size: 50px;
-}
-
-.hero-stat span {
-  color: #6f6876;
-  font-size: 8px;
-  letter-spacing: 1.5px;
-  font-weight: 950;
+.hero-stat span,
+.company-level-count span {
+  display: block;
+  margin-top: 8px;
+  color: #777;
+  font-size: 10px;
+  letter-spacing: .14em;
 }
 
 .section-heading {
   display: flex;
-  align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 18px;
+  align-items: end;
+  margin-bottom: 22px;
 }
 
 .section-heading h2 {
   margin: 7px 0 0;
-  font-size: 25px;
+  font-size: 27px;
+  letter-spacing: -.03em;
 }
 
-.company-grid {
+.section-heading > span {
+  color: #666;
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+
+.company-grid,
+.levels-grid {
   display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
-  gap: 12px;
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(
+        300px,
+        1fr
+      )
+    );
+  gap: 14px;
+}
+
+.company-card,
+.level-card {
+  border: 1px solid #252525;
+  background: #101010;
+  color: white;
+  border-radius: 18px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease;
+}
+
+.company-card:hover,
+.level-card:hover {
+  transform: translateY(-3px);
+  border-color: #444;
+  background: #141414;
 }
 
 .company-card {
   min-height: 170px;
-  position: relative;
-  padding: 21px;
-  text-align: left;
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 21px;
-  background: linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018));
-  color: #f7f4fb;
-  cursor: pointer;
-  transition: .18s ease;
-}
-
-.company-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(201,167,255,.25);
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
 
 .company-card-info {
-  margin-top: 19px;
+  flex: 1;
 }
 
-.company-card-info span {
-  color: #726b7a;
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: 1px;
+.company-card-info > span {
+  color: #777;
+  font-size: 10px;
+  letter-spacing: .12em;
 }
 
 .company-card-info h3 {
-  margin: 6px 0 4px;
-  font-size: 17px;
+  margin: 8px 0;
+  font-size: 22px;
 }
 
 .company-card-info p {
+  color: #777;
+  font-size: 13px;
+  line-height: 1.5;
   margin: 0;
-  color: #68616f;
-  font-size: 9px;
 }
 
-.company-card-arrow {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  color: #9d7dca;
-  font-size: 18px;
+.company-card-arrow,
+.level-arrow {
+  color: #aaa;
+  font-size: 22px;
 }
 
 .company-logo {
   width: 52px;
   height: 52px;
-  border-radius: 15px;
+  flex: 0 0 52px;
+  border-radius: 14px;
+  background: white;
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #fff;
-  border: 1px solid rgba(255,255,255,.12);
-  flex-shrink: 0;
-}
-
-.company-logo.large {
-  width: 92px;
-  height: 92px;
-  border-radius: 25px;
 }
 
 .company-logo img {
-  width: 72%;
-  height: 72%;
+  width: 80%;
+  height: 80%;
   object-fit: contain;
 }
 
 .company-logo span {
-  color: #151017;
-  font-size: 24px;
-  font-weight: 950;
+  color: #111;
+  font-size: 20px;
+  font-weight: 800;
 }
 
-.company-logo.large span {
-  font-size: 42px;
+.company-logo-large {
+  width: 92px;
+  height: 92px;
+  flex-basis: 92px;
+  border-radius: 22px;
 }
 
-.company-hero {
-  min-height: 230px;
-  display: flex;
-  align-items: center;
-  gap: 25px;
-  padding-bottom: 38px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+.company-logo-large span {
+  font-size: 36px;
 }
 
 .company-hero-copy {
   flex: 1;
 }
 
-.company-hero-copy > span {
-  color: #817889;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 1.5px;
-}
-
-.company-hero-copy h1 {
-  margin: 8px 0;
-  font-size: clamp(40px,5vw,65px);
-  letter-spacing: -3px;
-}
-
-.company-hero-copy p {
-  margin: 0;
-  color: #756e7c;
-}
-
-.company-level-count {
-  min-width: 130px;
-  text-align: right;
-}
-
-.company-level-count strong,
-.company-level-count span {
-  display: block;
-}
-
-.company-level-count strong {
-  font-size: 48px;
-}
-
-.company-level-count span {
-  color: #6d6675;
-  font-size: 8px;
-  letter-spacing: 1px;
-  font-weight: 950;
-}
-
-.levels-section {
-  padding-top: 38px;
-}
-
-.level-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
 .level-card {
-  width: 100%;
-  min-height: 90px;
-  display: grid;
-  grid-template-columns: 70px 1fr 100px 35px;
-  align-items: center;
-  gap: 20px;
-  padding: 12px 20px;
-  border: 1px solid rgba(255,255,255,.065);
-  border-radius: 17px;
-  color: #f6f2fa;
-  background: rgba(255,255,255,.025);
-  text-align: left;
-  cursor: pointer;
-  transition: .18s ease;
-}
-
-.level-card:hover {
-  transform: translateX(3px);
-  border-color: rgba(201,167,255,.22);
-  background: rgba(201,167,255,.045);
-}
-
-.level-card:disabled {
-  opacity: .6;
-  cursor: wait;
+  position: relative;
+  padding: 26px;
+  min-height: 245px;
 }
 
 .level-number {
-  color: #a889cf;
-  font-size: 22px;
-  font-weight: 950;
+  color: #777;
+  font-size: 10px;
+  letter-spacing: .16em;
+  font-weight: 800;
 }
 
-.level-main span {
-  color: #7c7485;
-  font-size: 8px;
-  font-weight: 950;
-  letter-spacing: 1px;
+.level-card h3 {
+  font-size: 25px;
+  margin: 13px 0;
 }
 
-.level-main h3 {
-  margin: 4px 0;
-  font-size: 15px;
-}
-
-.level-main p {
-  margin: 0;
-  color: #68616e;
-  font-size: 9px;
+.level-card p {
+  color: #777;
+  line-height: 1.6;
+  min-height: 52px;
 }
 
 .level-meta {
-  text-align: right;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 20px;
 }
 
-.level-meta strong,
-.level-meta span {
-  display: block;
-}
-
-.level-meta strong {
-  font-size: 18px;
-}
-
-.level-meta span {
-  color: #66606d;
-  font-size: 7px;
-  letter-spacing: 1px;
-  margin-top: 2px;
+.level-pill {
+  border: 1px solid #292929;
+  background: #151515;
+  color: #999;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 9px;
+  letter-spacing: .1em;
 }
 
 .level-arrow {
-  color: #9071b8;
-  font-size: 19px;
-}
-
-.loading-block {
-  min-height: 300px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 14px;
-  color: #77707e;
-  font-size: 11px;
-}
-
-.spinner {
-  width: 35px;
-  height: 35px;
-  border-radius: 50%;
-  border: 3px solid rgba(255,255,255,.08);
-  border-top-color: #c9a7ff;
-  animation: technical-spin .8s linear infinite;
-}
-
-@keyframes technical-spin {
-  to { transform: rotate(360deg); }
+  position: absolute;
+  right: 24px;
+  bottom: 23px;
 }
 
 .error-banner {
+  border: 1px solid #542b2b;
+  background: #1b0d0d;
+  color: #ddd;
+  padding: 16px 18px;
+  border-radius: 12px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 15px 18px;
-  margin-top: 20px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,90,110,.15);
-  background: rgba(255,70,90,.045);
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
 }
 
 .error-banner strong,
@@ -4122,113 +4209,538 @@ button {
   display: block;
 }
 
-.error-banner strong {
-  color: #ffabb5;
-  font-size: 11px;
-}
-
 .error-banner span {
-  margin-top: 4px;
-  color: #887b84;
-  font-size: 9px;
-}
-
-.error-banner button {
-  padding: 9px 12px;
-  border-radius: 9px;
-  border: 1px solid rgba(255,255,255,.08);
-  color: #bcaec0;
-  background: rgba(255,255,255,.04);
-  cursor: pointer;
-}
-
-.fullscreen-loader {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  background: rgba(5,4,8,.84);
-  backdrop-filter: blur(15px);
-}
-
-.fullscreen-loader > div {
-  display: grid;
-  place-items: center;
-  gap: 12px;
-}
-
-.fullscreen-loader strong {
+  color: #a88;
+  margin-top: 5px;
   font-size: 13px;
 }
 
-.fullscreen-loader span {
-  color: #706978;
+.error-banner button {
+  border: 1px solid #555;
+  background: #151515;
+  color: white;
+  border-radius: 8px;
+  padding: 9px 13px;
+  cursor: pointer;
+}
+
+.loading-block {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  color: #777;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #292929;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation:
+    spin .8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* TEST */
+
+.technical-test {
+  background: #080808;
+}
+
+.test-header {
+  height: 78px;
+  border-bottom: 1px solid #242424;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 28px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(
+    8,
+    8,
+    8,
+    .97
+  );
+}
+
+.test-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.test-brand strong {
+  display: block;
+  letter-spacing: .12em;
+}
+
+.test-brand span {
+  color: #777;
+  display: block;
+  font-size: 10px;
+  letter-spacing: .08em;
+  margin-top: 3px;
+}
+
+.test-status {
+  text-align: right;
+}
+
+.test-status > span {
+  color: #76c893;
   font-size: 9px;
+  letter-spacing: .14em;
+  display: block;
+}
+
+.test-status strong {
+  font-size: 26px;
+  display: block;
+  margin-top: 3px;
+}
+
+.test-status small {
+  color: #666;
+  font-size: 9px;
+}
+
+.timer-danger {
+  color: #ff6b6b;
+}
+
+.test-container {
+  width: min(
+    1450px,
+    calc(100% - 40px)
+  );
+  margin: 0 auto;
+  padding: 28px 0 50px;
+  display: grid;
+  grid-template-columns:
+    250px
+    minmax(
+      0,
+      1fr
+    );
+  gap: 20px;
+}
+
+.question-sidebar,
+.question-panel {
+  border: 1px solid #232323;
+  background: #0e0e0e;
+  border-radius: 18px;
+}
+
+.question-sidebar {
+  padding: 20px;
+  height: fit-content;
+  position: sticky;
+  top: 102px;
+}
+
+.sidebar-heading {
+  display: flex;
+  justify-content: space-between;
+  color: #777;
+  font-size: 10px;
+  letter-spacing: .1em;
+}
+
+.sidebar-heading strong {
+  color: white;
+}
+
+.progress-track {
+  height: 4px;
+  background: #202020;
+  border-radius: 99px;
+  overflow: hidden;
+  margin: 15px 0 20px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #eee;
+  transition: width .2s ease;
+}
+
+.question-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      5,
+      1fr
+    );
+  gap: 7px;
+}
+
+.question-jump {
+  aspect-ratio: 1;
+  border: 1px solid #292929;
+  background: #131313;
+  color: #777;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.question-jump.active {
+  border-color: #fff;
+  color: white;
+}
+
+.question-jump.answered {
+  background: #252525;
+  color: white;
+}
+
+.sidebar-note {
+  border-top: 1px solid #222;
+  margin-top: 20px;
+  padding-top: 17px;
+}
+
+.sidebar-note strong {
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+
+.sidebar-note p {
+  color: #666;
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.question-panel {
+  min-width: 0;
+  padding: 30px;
+}
+
+.question-meta {
+  display: flex;
+  justify-content: space-between;
+  color: #666;
+  font-size: 10px;
+  letter-spacing: .12em;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #202020;
+}
+
+.question-content {
+  padding: 40px 0;
+  max-width: 950px;
+}
+
+.markdown-content {
+  color: #ededed;
+  font-size: 20px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.markdown-content p {
+  margin: 0 0 12px;
+}
+
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  color: white;
+  line-height: 1.25;
+  margin: 12px 0;
+}
+
+.markdown-content code {
+  background: #181818;
+  border: 1px solid #292929;
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  font-size: .9em;
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid #555;
+  margin: 15px 0;
+  padding-left: 15px;
+  color: #999;
+}
+
+.markdown-content ul {
+  padding-left: 22px;
+}
+
+.markdown-content a {
+  color: white;
+}
+
+.md-space {
+  height: 5px;
+}
+
+.question-images {
+  display: grid;
+  gap: 16px;
+  margin: 25px 0;
+}
+
+.question-images figure {
+  margin: 0;
+  border: 1px solid #252525;
+  background: #080808;
+  border-radius: 12px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.question-images img {
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  display: block;
+}
+
+.options-list {
+  display: grid;
+  gap: 11px;
+  margin-top: 30px;
+}
+
+.option-card {
+  width: 100%;
+  border: 1px solid #292929;
+  background: #111;
+  color: white;
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns:
+    42px
+    minmax(
+      0,
+      1fr
+    )
+    30px;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option-card:hover {
+  border-color: #444;
+}
+
+.option-card.selected {
+  border-color: #fff;
+  background: #181818;
+}
+
+.option-letter {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #333;
+  border-radius: 9px;
+  color: #999;
+  font-weight: 700;
+}
+
+.option-card.selected
+.option-letter {
+  color: white;
+  border-color: white;
+}
+
+.option-text .markdown-content {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.option-check {
+  color: white;
+  font-size: 20px;
+  text-align: center;
+}
+
+.question-footer {
+  border-top: 1px solid #222;
+  padding-top: 20px;
+  display: grid;
+  grid-template-columns:
+    1fr
+    auto
+    1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.question-footer
+.primary-button {
+  justify-self: end;
+}
+
+.footer-progress {
+  color: #666;
+  font-size: 11px;
+}
+
+.primary-button,
+.secondary-button {
+  border-radius: 10px;
+  padding: 12px 17px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+.primary-button {
+  background: white;
+  color: black;
+  border: 1px solid white;
+}
+
+.secondary-button {
+  background: #151515;
+  color: white;
+  border: 1px solid #333;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.proctor-warning {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 100;
+  border: 1px solid #5a4b26;
+  background: #1d180c;
+  padding: 13px 18px;
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  max-width: calc(100% - 30px);
+  box-shadow:
+    0 15px 50px
+    rgba(
+      0,
+      0,
+      0,
+      .4
+    );
+}
+
+.proctor-warning strong {
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+
+.proctor-warning span {
+  color: #b7aa82;
+  font-size: 12px;
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 200;
+  background: rgba(
+    0,
+    0,
+    0,
+    .78
+  );
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(0,0,0,.78);
-  backdrop-filter: blur(15px);
 }
 
 .submit-modal {
-  width: min(510px,100%);
-  padding: 31px;
-  border-radius: 24px;
-  border: 1px solid rgba(255,255,255,.1);
-  background: #121017;
-  box-shadow: 0 40px 100px rgba(0,0,0,.55);
+  width: min(
+    520px,
+    100%
+  );
+  border: 1px solid #333;
+  border-radius: 20px;
+  background: #111;
+  padding: 30px;
+  box-shadow:
+    0 30px 100px
+    rgba(
+      0,
+      0,
+      0,
+      .6
+    );
 }
 
 .modal-symbol {
-  width: 50px;
-  height: 50px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #444;
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  margin-bottom: 18px;
-  border-radius: 14px;
-  color: #c9a7ff;
-  background: rgba(201,167,255,.09);
+  margin-bottom: 20px;
 }
 
 .submit-modal > span {
-  color: #9072b4;
-  font-size: 8px;
-  letter-spacing: 1.5px;
-  font-weight: 950;
+  color: #777;
+  font-size: 10px;
+  letter-spacing: .15em;
 }
 
 .submit-modal h2 {
-  margin: 9px 0;
-  font-size: 27px;
+  font-size: 31px;
+  margin: 10px 0;
 }
 
 .submit-modal p {
-  color: #817a88;
-  font-size: 12px;
-  line-height: 1.7;
+  color: #777;
+  line-height: 1.6;
 }
 
 .modal-stats {
   display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 8px;
-  margin: 20px 0;
+  grid-template-columns:
+    repeat(
+      3,
+      1fr
+    );
+  border: 1px solid #252525;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 22px 0;
 }
 
 .modal-stats > div {
   padding: 15px;
-  text-align: center;
-  border-radius: 12px;
-  background: rgba(255,255,255,.035);
-  border: 1px solid rgba(255,255,255,.05);
+  border-right: 1px solid #252525;
+}
+
+.modal-stats > div:last-child {
+  border-right: 0;
 }
 
 .modal-stats strong,
@@ -4241,917 +4753,298 @@ button {
 }
 
 .modal-stats span {
+  color: #666;
+  font-size: 8px;
+  letter-spacing: .1em;
   margin-top: 4px;
-  color: #6e6775;
-  font-size: 7px;
-  letter-spacing: 1px;
 }
 
 .modal-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  justify-content: flex-end;
   gap: 9px;
 }
 
-.modal-cancel,
-.modal-confirm {
-  min-height: 48px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 9px;
-  font-weight: 950;
-  letter-spacing: .8px;
+/* RESULT */
+
+.result-container {
+  width: min(
+    1100px,
+    calc(100% - 40px)
+  );
+  margin: 0 auto;
+  padding: 60px 0 80px;
 }
 
-.modal-cancel {
-  color: #a49ba9;
-  border: 1px solid rgba(255,255,255,.08);
-  background: rgba(255,255,255,.035);
-}
-
-.modal-confirm {
-  border: 0;
-  color: #170d20;
-  background: linear-gradient(135deg,#dccaff,#a97de8);
-}
-
-@media (max-width:1050px) {
-  .company-grid {
-    grid-template-columns: repeat(3,1fr);
-  }
-}
-
-@media (max-width:800px) {
-  .technical-container {
-    width: calc(100% - 28px);
-    padding-top: 35px;
-  }
-
-  .company-grid {
-    grid-template-columns: repeat(2,1fr);
-  }
-
-  .hero-block {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .level-card {
-    grid-template-columns: 50px 1fr 30px;
-  }
-
-  .level-meta,
-  .company-level-count {
-    display: none;
-  }
-}
-
-@media (max-width:600px) {
-  .technical-header {
-    padding: 0 14px;
-  }
-
-  .header-title {
-    display: none;
-  }
-
-  .company-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-block h1 {
-    font-size: 44px;
-    letter-spacing: -2px;
-  }
-
-  .company-hero-copy h1 {
-    font-size: 42px;
-  }
-
-  .company-logo.large {
-    width: 72px;
-    height: 72px;
-  }
-
-  .modal-stats,
-  .modal-actions {
-    grid-template-columns: 1fr;
-  }
-}
-`;
-
-/* ============================================================
-   TEST CSS
-============================================================ */
-
-const TECHNICAL_TEST_CSS = `
-* {
-  box-sizing: border-box;
-}
-
-.technical-test {
-  min-height: 100vh;
-  color: #f7f4fb;
-  background: #07060b;
-  font-family: Inter,ui-sans-serif,system-ui,sans-serif;
-}
-
-.testbar {
-  height: 76px;
-  display: grid;
-  grid-template-columns: 290px 1fr 150px;
-  align-items: center;
-  gap: 25px;
-  padding: 0 24px;
-  border-bottom: 1px solid rgba(255,255,255,.07);
-  background: rgba(7,6,11,.97);
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-
-.testbar-brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.testbar-brand .company-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
-}
-
-.testbar-brand strong,
-.testbar-brand span {
-  display: block;
-}
-
-.testbar-brand strong {
-  font-size: 12px;
-}
-
-.testbar-brand span {
-  margin-top: 3px;
-  color: #6f6877;
-  font-size: 8px;
-  letter-spacing: .8px;
-}
-
-.testbar-center {
-  max-width: 500px;
-  width: 100%;
-  justify-self: center;
-}
-
-.testbar-center > span {
-  display: block;
-  margin-bottom: 7px;
-  text-align: center;
-  color: #827989;
-  font-size: 8px;
-  font-weight: 950;
-  letter-spacing: 1.3px;
-}
-
-.top-progress {
-  height: 4px;
-  overflow: hidden;
-  border-radius: 20px;
-  background: rgba(255,255,255,.06);
-}
-
-.top-progress i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg,#a97ce7,#dccaff);
-}
-
-.test-timer {
-  padding: 10px 13px;
-  border-radius: 12px;
-  border: 1px solid rgba(201,167,255,.14);
-  background: rgba(201,167,255,.055);
-  text-align: center;
-}
-
-.test-timer span,
-.test-timer strong {
-  display: block;
-}
-
-.test-timer span {
-  color: #6f6877;
-  font-size: 7px;
-  letter-spacing: 1px;
-}
-
-.test-timer strong {
-  margin-top: 3px;
-  color: #d3bdf1;
-  font-size: 18px;
-}
-
-.test-timer.danger {
-  border-color: rgba(255,80,100,.25);
-  background: rgba(255,80,100,.07);
-}
-
-.test-timer.danger strong {
-  color: #ff8999;
-}
-
-.test-body {
-  min-height: calc(100vh - 76px);
-  display: grid;
-  grid-template-columns: 230px 1fr;
-}
-
-.test-sidebar {
-  padding: 22px;
-  border-right: 1px solid rgba(255,255,255,.06);
-  background: rgba(255,255,255,.012);
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-top {
+.result-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 18px;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 50px;
 }
 
-.sidebar-top span {
-  color: #746d7b;
-  font-size: 8px;
-  font-weight: 950;
-  letter-spacing: 1.3px;
-}
-
-.sidebar-top strong {
-  color: #b99bdb;
-  font-size: 10px;
-}
-
-.question-palette {
-  display: grid;
-  grid-template-columns: repeat(4,1fr);
-  gap: 7px;
-}
-
-.question-palette button {
-  aspect-ratio: 1;
-  border-radius: 9px;
-  border: 1px solid rgba(255,255,255,.065);
-  background: rgba(255,255,255,.025);
-  color: #706a78;
-  cursor: pointer;
-  font-size: 8px;
-  font-weight: 950;
-}
-
-.question-palette button.active {
-  color: #eadfff;
-  background: rgba(201,167,255,.14);
-  border-color: rgba(201,167,255,.4);
-}
-
-.question-palette button.answered {
-  color: #91dba8;
-  background: rgba(100,220,140,.06);
-  border-color: rgba(100,220,140,.16);
-}
-
-.question-palette button.active.answered {
-  color: #eadfff;
-  background: rgba(201,167,255,.14);
-}
-
-.sidebar-bottom {
-  margin-top: auto;
-  padding: 15px;
-  border-radius: 14px;
-  background: rgba(201,167,255,.035);
-  border: 1px solid rgba(201,167,255,.07);
-}
-
-.sidebar-bottom span,
-.sidebar-bottom strong {
-  display: block;
-}
-
-.sidebar-bottom span {
-  color: #6f6876;
-  font-size: 7px;
-  letter-spacing: 1px;
-}
-
-.sidebar-bottom strong {
-  margin: 7px 0;
-  font-size: 24px;
-}
-
-.sidebar-bottom > div {
-  height: 5px;
-  border-radius: 20px;
-  overflow: hidden;
-  background: rgba(255,255,255,.06);
-}
-
-.sidebar-bottom i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg,#a97ce7,#dccaff);
-}
-
-.test-question-area {
-  width: min(1000px,calc(100% - 60px));
-  margin: auto;
-  padding: 38px 0 30px;
-  display: flex;
-  flex-direction: column;
-}
-
-.question-meta {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 13px;
-}
-
-.question-meta span {
-  padding: 6px 9px;
-  border-radius: 7px;
-  color: #8c79a4;
-  background: rgba(201,167,255,.055);
-  font-size: 8px;
-  font-weight: 950;
-}
-
-.question-container {
-  flex: 1;
-  padding: clamp(25px,4vw,52px);
-  border-radius: 25px;
-  border: 1px solid rgba(255,255,255,.075);
-  background: linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.017));
-}
-
-.question-index {
-  color: #9d7cc3;
-  font-size: 11px;
-  font-weight: 950;
-  letter-spacing: 2px;
-  margin-bottom: 18px;
-}
-
-.question-container h1 {
-  max-width: 900px;
-  margin: 0;
-  font-size: clamp(23px,3vw,35px);
-  line-height: 1.42;
-}
-
-.question-images {
-  margin: 25px 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.question-images img {
-  max-width: 100%;
-  max-height: 280px;
-  object-fit: contain;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.08);
-}
-
-.answer-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 32px;
-}
-
-.answer-options button {
-  min-height: 66px;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 9px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,.07);
-  color: #bbb4c1;
-  background: rgba(255,255,255,.025);
-  text-align: left;
-  cursor: pointer;
-}
-
-.answer-options button.selected {
-  color: #fff;
-  border-color: rgba(201,167,255,.42);
-  background: rgba(201,167,255,.085);
-}
-
-.option-letter {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  border-radius: 10px;
-  background: rgba(255,255,255,.045);
-  color: #817989;
-  font-weight: 950;
-}
-
-.selected .option-letter {
-  color: #ddcaff;
-  background: rgba(201,167,255,.15);
-}
-
-.option-text {
-  flex: 1;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.option-check {
-  width: 25px;
-  color: #c9a7ff;
-  font-size: 18px;
-  font-weight: 950;
-  text-align: center;
-}
-
-.test-navigation {
-  min-height: 55px;
-  display: grid;
-  grid-template-columns: 150px 1fr 150px;
-  align-items: center;
-  gap: 15px;
-  margin-top: 15px;
-}
-
-.nav-secondary,
-.nav-primary,
-.nav-submit {
-  min-height: 46px;
-  border-radius: 11px;
-  cursor: pointer;
-  font-size: 8px;
-  font-weight: 950;
-  letter-spacing: 1px;
-}
-
-.nav-secondary {
-  color: #a59da9;
-  border: 1px solid rgba(255,255,255,.07);
-  background: rgba(255,255,255,.03);
-}
-
-.nav-primary {
-  border: 0;
-  color: #170d20;
-  background: linear-gradient(135deg,#dccaff,#a97de8);
-}
-
-.nav-submit {
-  border: 0;
-  color: #07170d;
-  background: linear-gradient(135deg,#9fe8b6,#66cc89);
-}
-
-.nav-status {
-  text-align: center;
-  color: #68616f;
-  font-size: 8px;
-  font-weight: 950;
-  letter-spacing: 1px;
-}
-
-.proctor-badge {
-  display: inline-flex !important;
-  align-items: center;
-  gap: 6px;
-  margin-left: 10px;
-  padding: 5px 8px;
-  border-radius: 7px;
-  color: #9fe8b6 !important;
-  background: rgba(100,220,140,.055);
-  border: 1px solid rgba(100,220,140,.12);
-  font-size: 7px !important;
-  font-weight: 950;
-}
-
-.proctor-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #7ee59b;
-}
-
-.proctor-count {
-  color: #ff9aa7 !important;
-  font-size: 8px !important;
-}
-
-.proctor-warning {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 80;
-  max-width: 360px;
-  padding: 13px 15px;
-  border: 1px solid rgba(255,90,110,.22);
-  border-radius: 13px;
-  background: rgba(35,10,15,.94);
-}
-
-.proctor-warning strong,
-.proctor-warning span {
-  display: block;
-}
-
-.proctor-warning strong {
-  color: #ff9aa7;
-  font-size: 10px;
-}
-
-.proctor-warning span {
-  margin-top: 4px;
-  color: #a78d94;
-  font-size: 9px;
-}
-
-@media (max-width:850px) {
-  .testbar {
-    grid-template-columns: 1fr auto;
-  }
-
-  .testbar-center {
-    display: none;
-  }
-
-  .test-body {
-    grid-template-columns: 1fr;
-  }
-
-  .test-sidebar {
-    display: none;
-  }
-
-  .test-question-area {
-    width: calc(100% - 28px);
-    padding-top: 22px;
-  }
-}
-
-@media (max-width:550px) {
-  .testbar {
-    height: 65px;
-    padding: 0 12px;
-  }
-
-  .test-body {
-    min-height: calc(100vh - 65px);
-  }
-
-  .test-question-area {
-    width: calc(100% - 20px);
-  }
-
-  .question-container {
-    padding: 20px;
-    border-radius: 19px;
-  }
-
-  .question-container h1 {
-    font-size: 21px;
-  }
-
-  .test-navigation {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .nav-status {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
-}
-`;
-
-/* ============================================================
-   RESULT CSS
-============================================================ */
-
-const RESULT_CSS = `
-* {
-  box-sizing: border-box;
-}
-
-.technical-result {
-  min-height: 100vh;
-  padding: 45px 20px 80px;
-  color: #f7f4fb;
-  background:
-    radial-gradient(circle at 80% 0%,rgba(159,110,255,.13),transparent 34%),
-    #07060b;
-  font-family: Inter,ui-sans-serif,system-ui,sans-serif;
-}
-
-.result-wrap {
-  width: min(1050px,100%);
-  margin: auto;
-}
-
-.result-company {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 45px;
-}
-
-.result-company span,
-.result-company strong {
-  display: block;
-}
-
-.result-company span {
-  color: #746d7c;
-  font-size: 8px;
-  letter-spacing: 1px;
-  font-weight: 950;
-}
-
-.result-company strong {
-  margin-top: 4px;
-  font-size: 15px;
-}
-
-.result-heading > span {
-  color: #9b7dc2;
-  font-size: 9px;
-  font-weight: 950;
-  letter-spacing: 1.8px;
-}
-
-.result-heading h1 {
-  margin: 9px 0 7px;
-  font-size: clamp(42px,6vw,70px);
-  line-height: 1;
-  letter-spacing: -3px;
-}
-
-.result-heading p {
-  color: #817a88;
-  font-size: 13px;
-}
-
-.result-score-card {
-  min-height: 280px;
-  display: flex;
-  align-items: center;
-  gap: 50px;
-  margin-top: 30px;
-  padding: 35px;
-  border-radius: 27px;
-  border: 1px solid rgba(255,255,255,.08);
-  background: linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.018));
-}
-
-.score-ring {
-  width: 190px;
-  height: 190px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background:
-    radial-gradient(circle,#100d15 61%,transparent 62%),
-    conic-gradient(#c9a7ff var(--score),rgba(255,255,255,.06) 0);
-}
-
-.score-ring > div {
-  display: flex;
-  align-items: baseline;
-}
-
-.score-ring strong {
-  font-size: 55px;
-  letter-spacing: -3px;
-}
-
-.score-ring span {
-  color: #6e6876;
-  font-size: 11px;
-}
-
-.score-copy > span {
-  color: #817989;
-  font-size: 8px;
-  font-weight: 950;
-  letter-spacing: 1.5px;
-}
-
-.score-copy h2 {
-  margin: 9px 0;
-  font-size: 29px;
-}
-
-.score-copy p {
-  color: #827b89;
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.result-metrics {
-  display: grid;
-  grid-template-columns: repeat(4,1fr);
-  gap: 9px;
+.result-header h1 {
+  font-size: 52px;
+  letter-spacing: -.05em;
   margin: 12px 0;
 }
 
-.result-metric {
-  padding: 20px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.06);
-  background: rgba(255,255,255,.025);
+.result-header p {
+  color: #777;
 }
 
-.result-metric span,
-.result-metric strong {
-  display: block;
+.completed-badge {
+  border: 1px solid #31573d;
+  color: #8dd6a1;
+  padding: 10px 13px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: .1em;
 }
 
-.result-metric span {
-  color: #6f6876;
-  font-size: 7px;
-  font-weight: 950;
-  letter-spacing: 1.2px;
-}
-
-.result-metric strong {
-  margin-top: 7px;
-  font-size: 24px;
-}
-
-.module-analysis {
-  margin-top: 12px;
-  padding: 27px;
-  border-radius: 23px;
-  border: 1px solid rgba(255,255,255,.07);
-  background: rgba(255,255,255,.025);
-}
-
-.result-section-heading span {
-  color: #827989;
-  font-size: 8px;
-  font-weight: 950;
-  letter-spacing: 1.5px;
-}
-
-.result-section-heading h2 {
-  margin: 7px 0 22px;
-  font-size: 21px;
-}
-
-.module-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.module-row {
+.score-hero {
   display: grid;
-  grid-template-columns: 180px 1fr 55px;
+  grid-template-columns:
+    250px
+    1fr;
+  gap: 45px;
   align-items: center;
-  gap: 15px;
+  padding: 45px;
+  border: 1px solid #252525;
+  background: #101010;
+  border-radius: 22px;
 }
 
-.module-row > div:first-child strong,
-.module-row > div:first-child span {
-  display: block;
+.score-circle {
+  width: 210px;
+  height: 210px;
+  border: 2px solid #eee;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  margin: auto;
 }
 
-.module-row > div:first-child strong {
-  font-size: 12px;
+.score-circle strong {
+  font-size: 48px;
+  letter-spacing: -.05em;
 }
 
-.module-row > div:first-child span {
-  margin-top: 3px;
-  color: #6c6573;
-  font-size: 8px;
+.score-circle span {
+  color: #777;
+  font-size: 9px;
+  letter-spacing: .14em;
 }
 
-.module-progress {
-  height: 7px;
+.score-copy > span {
+  color: #777;
+  font-size: 10px;
+  letter-spacing: .15em;
+}
+
+.score-copy h2 {
+  font-size: 42px;
+  margin: 10px 0;
+}
+
+.score-copy p {
+  color: #777;
+  line-height: 1.7;
+  max-width: 560px;
+}
+
+.result-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      5,
+      1fr
+    );
+  margin: 18px 0;
+  border: 1px solid #252525;
+  border-radius: 16px;
   overflow: hidden;
-  border-radius: 20px;
-  background: rgba(255,255,255,.06);
 }
 
-.module-progress i {
+.result-stat {
+  padding: 22px;
+  border-right: 1px solid #252525;
+}
+
+.result-stat:last-child {
+  border-right: 0;
+}
+
+.result-stat strong {
   display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg,#a97ce7,#dccaff);
+  font-size: 27px;
 }
 
-.module-row > strong {
-  text-align: right;
-  color: #c9a7ff;
+.result-stat span {
+  color: #666;
+  display: block;
+  margin-top: 6px;
+  font-size: 9px;
+  letter-spacing: .12em;
+}
+
+.breakdown-section {
+  margin-top: 45px;
+}
+
+.breakdown-grid {
+  display: grid;
+  gap: 9px;
+}
+
+.breakdown-card {
+  border: 1px solid #242424;
+  background: #101010;
+  border-radius: 12px;
+  padding: 17px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.breakdown-card div strong,
+.breakdown-card div span {
+  display: block;
+}
+
+.breakdown-card div span {
+  color: #666;
+  margin-top: 4px;
   font-size: 11px;
 }
 
-.no-analysis {
-  padding: 25px;
-  border-radius: 12px;
-  color: #6e6875;
-  background: rgba(255,255,255,.025);
-  font-size: 10px;
-}
-
-.result-note {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-top: 12px;
-  padding: 15px;
-  border-radius: 14px;
-  border: 1px solid rgba(201,167,255,.08);
-  background: rgba(201,167,255,.025);
-}
-
-.result-note > span {
-  width: 29px;
-  height: 29px;
-  display: grid;
-  place-items: center;
-  border-radius: 9px;
-  color: #c9a7ff;
-  background: rgba(201,167,255,.08);
-}
-
-.result-note p {
-  margin: 0;
-  color: #726b79;
-  font-size: 9px;
-}
-
 .result-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 35px;
 }
 
-.result-secondary,
-.result-primary {
-  min-height: 52px;
-  border-radius: 13px;
-  cursor: pointer;
-  font-size: 9px;
-  font-weight: 950;
-  letter-spacing: 1px;
+@media (
+  max-width: 900px
+) {
+  .test-container {
+    grid-template-columns: 1fr;
+  }
+
+  .question-sidebar {
+    position: static;
+  }
+
+  .question-grid {
+    grid-template-columns:
+      repeat(
+        10,
+        1fr
+      );
+  }
+
+  .score-hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
 }
 
-.result-secondary {
-  color: #afa7b3;
-  border: 1px solid rgba(255,255,255,.08);
-  background: rgba(255,255,255,.035);
-}
+@media (
+  max-width: 700px
+) {
+  .technical-container,
+  .result-container {
+    width: min(
+      100% - 24px,
+      1400px
+    );
+    padding-top: 24px;
+  }
 
-.result-primary {
-  border: 0;
-  color: #170d20;
-  background: linear-gradient(135deg,#dccaff,#a97de8);
-}
-
-@media (max-width:700px) {
-  .result-score-card {
+  .lab-hero,
+  .company-hero {
+    padding: 25px;
     flex-direction: column;
     align-items: flex-start;
-    gap: 25px;
   }
 
-  .result-metrics {
-    grid-template-columns: repeat(2,1fr);
+  .hero-stat,
+  .company-level-count {
+    text-align: left;
   }
 
-  .module-row {
-    grid-template-columns: 1fr 50px;
+  .company-grid,
+  .levels-grid {
+    grid-template-columns: 1fr;
   }
 
-  .module-progress {
-    grid-column: 1 / -1;
-    grid-row: 2;
+  .test-header {
+    padding: 0 13px;
+  }
+
+  .test-container {
+    width: calc(100% - 18px);
+  }
+
+  .question-panel {
+    padding: 20px;
+  }
+
+  .question-content {
+    padding: 25px 0;
+  }
+
+  .markdown-content {
+    font-size: 17px;
+  }
+
+  .question-footer {
+    grid-template-columns:
+      1fr
+      1fr;
+  }
+
+  .footer-progress {
+    display: none;
+  }
+
+  .result-header {
+    flex-direction: column;
+  }
+
+  .result-header h1 {
+    font-size: 38px;
+  }
+
+  .result-stats {
+    grid-template-columns:
+      repeat(
+        2,
+        1fr
+      );
+  }
+
+  .result-stat {
+    border-bottom: 1px solid #252525;
   }
 
   .result-actions {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
+  }
+
+  .result-actions button {
+    flex: 1;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions button {
+    width: 100%;
   }
 }
 `;
