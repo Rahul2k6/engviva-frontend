@@ -1382,59 +1382,95 @@ export default function CompanyDetails() {
 
      Everything goes directly to the module.
   ======================================================= */
+const goToPractice =
+  useCallback(
+    (module) => {
+      if (!companyId) {
+        return;
+      }
 
-  const goToPractice =
-    useCallback(
-      (module) => {
-        if (!companyId) return;
+      const company =
+        encodeURIComponent(
+          companyId
+        );
 
-        const role =
-          encodeURIComponent(
-            selectedRole ||
-              ""
+      const role =
+        encodeURIComponent(
+          selectedRole || ""
+        );
+
+      switch (module) {
+
+        /* =================================================
+           APTITUDE
+        ================================================= */
+
+        case "aptitude":
+          navigate(
+            `/practice/assessments?company=${company}&role=${role}`
           );
+          break;
 
-        const company =
-          encodeURIComponent(
-            companyId
+        /* =================================================
+           TECHNICAL
+
+           IMPORTANT:
+
+           We intentionally use query parameters here
+           because TechnicalAssessment supports:
+
+             /technical-lab?company=google&role=...
+
+           Therefore the exact CompanyDetails company
+           is opened directly.
+        ================================================= */
+
+        case "technical":
+          navigate(
+            `/technical-lab?company=${company}&role=${role}`
           );
+          break;
 
-        switch (module) {
-         case "aptitude":
-  navigate(
-    `/practice/assessments?company=${company}&role=${role}`
+        /* =================================================
+           CODING
+
+           IMPORTANT:
+
+           App.jsx uses:
+
+             /practice/coding
+
+           NOT:
+
+             /coding-lab
+        ================================================= */
+
+        case "coding":
+          navigate(
+            `/practice/coding?company=${company}&role=${role}`
+          );
+          break;
+
+        /* =================================================
+           INTERVIEW
+        ================================================= */
+
+        case "interview":
+          navigate(
+            `/interviews?company=${company}&role=${role}`
+          );
+          break;
+
+        default:
+          break;
+      }
+    },
+    [
+      companyId,
+      selectedRole,
+      navigate,
+    ]
   );
-  break;
-
-          case "technical":
-            navigate(
-              `/technical-lab?company=${companyId}&role=${role}`
-            );
-            break;
-
-          case "coding":
-            navigate(
-              `/coding-lab?company=${company}&role=${role}`
-            );
-            break;
-
-          case "interview":
-            navigate(
-              `/interviews?company=${company}&role=${role}`
-            );
-            break;
-
-          default:
-            break;
-        }
-      },
-      [
-        companyId,
-        selectedRole,
-        navigate,
-      ]
-    );
-
   const goToProgress =
     useCallback(() => {
       const company =

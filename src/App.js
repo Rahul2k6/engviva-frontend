@@ -1,4 +1,5 @@
 ﻿import React from "react";
+
 import {
   BrowserRouter,
   Navigate,
@@ -6,43 +7,101 @@ import {
   Routes,
 } from "react-router-dom";
 
+/* =========================================================
+   ENTRY
+========================================================= */
+
 import SplashScreen from "./screens/SplashScreen";
 import LoginScreen from "./screens/LoginScreen";
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+
 import Dashboard from "./screens/Dashboard";
+
+/* =========================================================
+   PROFILE
+========================================================= */
 
 import ProfileSetup from "./screens/ProfileSetup";
 import Profile from "./screens/Profile";
+
+/* =========================================================
+   COMPANIES
+========================================================= */
 
 import Companies from "./screens/Companies";
 import CompanyDetails from "./screens/CompanyDetails";
 import RolePreparation from "./screens/RolePreparation";
 
+/* =========================================================
+   PRACTICE
+========================================================= */
+
 import Practice from "./screens/Practice";
 import Assessments from "./screens/Assessments";
 import AssessmentTest from "./screens/AssessmentTest";
 
+/* =========================================================
+   TECHNICAL
+========================================================= */
+
 import TechnicalAssessment from "./screens/TechnicalAssessment";
+
+/* =========================================================
+   CODING
+========================================================= */
+
 import CodingLab from "./screens/CodingLab";
+
+/* =========================================================
+   INTERVIEWS
+========================================================= */
 
 import Interviews from "./screens/Interviews";
 import UpcomingInterviews from "./screens/UpcomingInterviews";
 import CompletedInterviews from "./screens/CompletedInterviews";
 import Interview from "./screens/Interview";
 
+/* =========================================================
+   RESUME
+========================================================= */
+
 import Resume from "./screens/Resume";
+
+/* =========================================================
+   REPORTS
+========================================================= */
 
 import Reports from "./screens/Reports";
 import ReportDetails from "./screens/ReportDetails";
 
+/* =========================================================
+   PROGRESS
+========================================================= */
+
 import Progress from "./screens/Progress";
+
+/* =========================================================
+   NOTIFICATIONS
+========================================================= */
+
 import Notifications from "./screens/Notifications";
+
+/* =========================================================
+   APP
+========================================================= */
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* ENTRY */}
+        {/* =================================================
+            ENTRY
+        ================================================= */}
+
         <Route
           path="/"
           element={<SplashScreen />}
@@ -53,13 +112,19 @@ export default function App() {
           element={<LoginScreen />}
         />
 
-        {/* DASHBOARD */}
+        {/* =================================================
+            DASHBOARD
+        ================================================= */}
+
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
-        {/* PROFILE */}
+        {/* =================================================
+            PROFILE
+        ================================================= */}
+
         <Route
           path="/profile-setup"
           element={<ProfileSetup />}
@@ -70,7 +135,10 @@ export default function App() {
           element={<Profile />}
         />
 
-        {/* COMPANIES */}
+        {/* =================================================
+            COMPANIES
+        ================================================= */}
+
         <Route
           path="/companies"
           element={<Companies />}
@@ -81,17 +149,27 @@ export default function App() {
           element={<CompanyDetails />}
         />
 
-        {/* ROLE PREPARATION */}
+        {/* =================================================
+            ROLE PREPARATION
+        ================================================= */}
+
         <Route
           path="/role-preparation"
           element={<RolePreparation />}
         />
 
-        {/* PRACTICE */}
+        {/* =================================================
+            PRACTICE
+        ================================================= */}
+
         <Route
           path="/practice"
           element={<Practice />}
         />
+
+        {/* =================================================
+            APTITUDE / ASSESSMENTS
+        ================================================= */}
 
         <Route
           path="/practice/assessments"
@@ -103,41 +181,66 @@ export default function App() {
           element={<AssessmentTest />}
         />
 
-        {/* =====================================================
+        {/* =================================================
             TECHNICAL LAB
-        ===================================================== */}
+        =================================================
 
-        {/* Company selection */}
+            IMPORTANT:
+
+            /technical-lab
+                -> FULL COMPANY LIST
+
+            /technical-lab/:companyId
+                -> DIRECT COMPANY
+
+            /technical-lab/:companyId/levels
+                -> COMPANY LEVELS
+
+            /technical-lab/:companyId/level/:levelNumber
+                -> ACTIVE TEST
+
+            /technical-lab/:companyId/level/:levelNumber/result
+                -> RESULT
+        ================================================= */}
+
         <Route
           path="/technical-lab"
           element={<TechnicalAssessment />}
         />
 
-        {/* Technical levels */}
+        <Route
+          path="/technical-lab/:companyId"
+          element={<TechnicalAssessment />}
+        />
+
         <Route
           path="/technical-lab/:companyId/levels"
           element={<TechnicalAssessment />}
         />
 
-        {/* Active technical test */}
         <Route
           path="/technical-lab/:companyId/level/:levelNumber"
           element={<TechnicalAssessment />}
         />
 
-        {/* Technical result */}
         <Route
           path="/technical-lab/:companyId/level/:levelNumber/result"
           element={<TechnicalAssessment />}
         />
 
-        {/* CODING */}
+        {/* =================================================
+            CODING LAB
+        ================================================= */}
+
         <Route
           path="/practice/coding"
           element={<CodingLab />}
         />
 
-        {/* INTERVIEWS */}
+        {/* =================================================
+            INTERVIEWS
+        ================================================= */}
+
         <Route
           path="/interviews"
           element={<Interviews />}
@@ -158,13 +261,19 @@ export default function App() {
           element={<Interview />}
         />
 
-        {/* RESUME */}
+        {/* =================================================
+            RESUME
+        ================================================= */}
+
         <Route
           path="/resume"
           element={<Resume />}
         />
 
-        {/* REPORTS */}
+        {/* =================================================
+            REPORTS
+        ================================================= */}
+
         <Route
           path="/reports"
           element={<Reports />}
@@ -175,19 +284,28 @@ export default function App() {
           element={<ReportDetails />}
         />
 
-        {/* PROGRESS */}
+        {/* =================================================
+            PROGRESS
+        ================================================= */}
+
         <Route
           path="/progress"
           element={<Progress />}
         />
 
-        {/* NOTIFICATIONS */}
+        {/* =================================================
+            NOTIFICATIONS
+        ================================================= */}
+
         <Route
           path="/notifications"
           element={<Notifications />}
         />
 
-        {/* FALLBACK */}
+        {/* =================================================
+            FALLBACK
+        ================================================= */}
+
         <Route
           path="*"
           element={

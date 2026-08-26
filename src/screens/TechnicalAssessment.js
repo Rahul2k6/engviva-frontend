@@ -649,10 +649,36 @@ export default function TechnicalAssessment() {
   const location = useLocation();
   const params = useParams();
 
-  const companyId = normalizeId(params.companyId);
+  const query = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
+
+  const companyId = normalizeId(
+    firstValue(
+      params.companyId,
+      query.get("company"),
+      query.get("companyId"),
+      location.state?.companyId,
+      location.state?.company?.id
+    )
+  );
+
   const levelNumber = safeNumber(
-    params.levelNumber,
+    firstValue(
+      params.levelNumber,
+      query.get("level"),
+      location.state?.levelNumber
+    ),
     0
+  );
+
+  const roleFromUrl = String(
+    firstValue(
+      query.get("role"),
+      location.state?.role,
+      "Software Engineer"
+    )
   );
 
   const isResultRoute =
@@ -734,6 +760,9 @@ export default function TechnicalAssessment() {
   const [submitting, setSubmitting] =
     useState(false);
 
+  const [showSubmit, setShowSubmit] =
+  useState(false);
+
   const submittingRef = useRef(false);
 
   const [result, setResult] =
@@ -761,6 +790,7 @@ export default function TechnicalAssessment() {
   const submitRef = useRef(null);
 
   const violationLockRef = useRef(false);
+  const fullscreenGraceRef = useRef(false);
 
   /* ----------------------------------------------------------
      SYNCHRONIZE REFS
@@ -783,6 +813,33 @@ export default function TechnicalAssessment() {
     violationsRef.current =
       violations;
   }, [violations]);
+
+  /*
+   * Keep route and screen state synchronized when React Router
+   * reuses this component for a different CompanyDetails link.
+   */
+  useEffect(() => {
+    if (screen === "running") return;
+
+    if (isResultRoute) {
+      setScreen("result");
+      return;
+    }
+
+    if (companyId) {
+      setSelectedCompany((current) =>
+        current?.id === companyId
+          ? current
+          : getFallbackCompany(companyId)
+      );
+      setScreen("levels");
+      return;
+    }
+
+    setSelectedCompany(null);
+    setLevels([]);
+    setScreen("companies");
+  }, [companyId, isResultRoute, screen]);
 
   /* ----------------------------------------------------------
      COMPANY
@@ -900,6 +957,8 @@ export default function TechnicalAssessment() {
           ? root.levels
           : Array.isArray(root?.items)
           ? root.items
+          : Array.isArray(root?.data)
+          ? root.data
           : [];
 
         if (!parsed.length) {
@@ -911,6 +970,37 @@ export default function TechnicalAssessment() {
         }
 
         setLevels(parsed);
+
+        /*
+         * Company profile is metadata only. If this endpoint is
+         * unavailable, keep the safe local company metadata.
+         */
+        try {
+          const companyPayload =
+            await apiFetch(
+              `/api/technical/company/${encodeURIComponent(
+                id
+              )}`
+            );
+
+          const normalized =
+            normalizeCompany(
+              companyPayload?.data ??
+                companyPayload?.company ??
+                companyPayload
+            );
+
+          if (normalized.id) {
+            setSelectedCompany(
+              normalized
+            );
+          }
+        } catch (profileError) {
+          console.warn(
+            "[TECHNICAL COMPANY PROFILE] Using fallback metadata.",
+            profileError
+          );
+        }
       } catch (error) {
         console.error(
           "[TECHNICAL LEVELS]",
@@ -1042,9 +1132,18 @@ export default function TechnicalAssessment() {
       navigate(
         `/technical-lab/${encodeURIComponent(
           normalized.id
-        )}/levels`,
+        )}/levels?role=${encodeURIComponent(
+          roleFromUrl
+        )}`,
         {
           replace: true,
+          state: {
+            companyId:
+              normalized.id,
+            company:
+              normalized,
+            role: roleFromUrl,
+          },
         }
       );
     },
@@ -1059,16 +1158,16 @@ export default function TechnicalAssessment() {
     useCallback(
       async (id, level) => {
         /*
-          PRIMARY:
-          ONE request for the entire level.
-        */
-
+         * Canonical backend endpoint.
+         * Older deployments may expose /questions, so only a
+         * 404 activates the compatibility fallback.
+         */
         try {
           const payload =
             await apiFetch(
               `/api/technical/company/${encodeURIComponent(
                 id
-              )}/levels/${level}/questions`
+              )}/levels/${level}`
             );
 
           const normalized =
@@ -1078,20 +1177,12 @@ export default function TechnicalAssessment() {
 
           if (!normalized.length) {
             throw new Error(
-              "The technical level returned no usable questions."
+              "This technical level contains no usable questions."
             );
           }
 
           return normalized;
         } catch (error) {
-          /*
-            Compatibility fallback for a backend that has
-            not deployed the bulk endpoint yet.
-
-            This is NOT question-by-question loading.
-            It makes ONE fallback request to the level endpoint.
-          */
-
           if (error.status !== 404) {
             throw error;
           }
@@ -1100,7 +1191,7 @@ export default function TechnicalAssessment() {
             await apiFetch(
               `/api/technical/company/${encodeURIComponent(
                 id
-              )}/levels/${level}`
+              )}/levels/${level}/questions`
             );
 
           const normalized =
@@ -1151,24 +1242,17 @@ export default function TechnicalAssessment() {
       setError("");
 
       /*
-        IMPORTANT:
-        Fullscreen is requested immediately from the click.
-      */
-      await enterFullscreen();
+       * Fullscreen is requested before the first network await,
+       * preserving the browser user-gesture requirement.
+       */
+      enterFullscreen();
 
       try {
         /*
-          Load ALL questions in ONE request.
-        */
-        const normalized =
-          await loadAllQuestions(
-            selectedCompany.id,
-            number
-          );
-
-        /*
-          Start server-side attempt.
-        */
+         * BACKEND CONTRACT:
+         * POST /api/technical/assessment/start
+         * body: { companyId, levelNumber }
+         */
         const startPayload =
           await apiFetch(
             "/api/technical/assessment/start",
@@ -1177,16 +1261,7 @@ export default function TechnicalAssessment() {
               body: JSON.stringify({
                 companyId:
                   selectedCompany.id,
-
                 levelNumber: number,
-
-                totalQuestions:
-                  normalized.length,
-
-                mode: "proctored",
-
-                proctoringMode:
-                  "browser_fullscreen",
               }),
             }
           );
@@ -1197,22 +1272,30 @@ export default function TechnicalAssessment() {
 
         const id = firstValue(
           attempt?.attemptId,
-          attempt?.assessmentId,
-          attempt?.id,
           startPayload?.attemptId
         );
 
         if (!id) {
           throw new Error(
-            "The server did not return a technical attempt ID."
+            "Server did not return an attempt ID."
           );
         }
 
-        const durationMinutes =
+        /*
+         * Load questions only after the server attempt exists.
+         */
+        const normalized =
+          await loadAllQuestions(
+            selectedCompany.id,
+            number
+          );
+
+        let durationMinutes =
           Math.max(
             1,
             safeNumber(
               firstValue(
+                attempt?.level?.estimatedMinutes,
                 attempt?.estimatedMinutes,
                 level?.estimatedMinutes,
                 60
@@ -1220,6 +1303,38 @@ export default function TechnicalAssessment() {
               60
             )
           );
+
+        /*
+         * Read authoritative level metadata when available.
+         * Failure here must not destroy an otherwise valid test.
+         */
+        try {
+          const levelPayload =
+            await apiFetch(
+              `/api/technical/company/${encodeURIComponent(
+                selectedCompany.id
+              )}/levels/${number}`
+            );
+
+          const levelRoot =
+            levelPayload?.data ??
+            levelPayload;
+
+          durationMinutes =
+            Math.max(
+              1,
+              safeNumber(
+                firstValue(
+                  levelRoot?.estimatedMinutes,
+                  levelRoot?.level?.estimatedMinutes,
+                  durationMinutes
+                ),
+                durationMinutes
+              )
+            );
+        } catch {
+          /* Keep the valid fallback duration. */
+        }
 
         const allowedSeconds =
           Math.max(
@@ -1247,24 +1362,16 @@ export default function TechnicalAssessment() {
         };
 
         saveAttempt(session);
-
         clearResult();
 
         setAttemptId(id);
-        setSelectedCompany(
-          selectedCompany
-        );
-        setQuestions(
-          normalized
-        );
+        setQuestions(normalized);
         setAnswers({});
         answersRef.current = {};
-
         setCurrentIndex(0);
 
         setStartedAt(now);
-        startedAtRef.current =
-          now;
+        startedAtRef.current = now;
 
         setTimeAllowed(
           allowedSeconds
@@ -1278,26 +1385,38 @@ export default function TechnicalAssessment() {
           allowedSeconds;
 
         setViolations([]);
-        violationsRef.current =
-          [];
+        violationsRef.current = [];
 
         setProctorWarning("");
         setProctorLocked(false);
-
+        setShowSubmit(false);
         setResult(null);
+
+        /*
+         * Ignore the browser's own fullscreen transition for
+         * 1.5 seconds so it cannot self-trigger a violation.
+         */
+        fullscreenGraceRef.current = true;
+
+        setTimeout(() => {
+          fullscreenGraceRef.current = false;
+        }, 1500);
 
         setScreen("running");
 
-        /*
-          CLEAN ROUTE:
-          NO /attempt/:id
-        */
         navigate(
           `/technical-lab/${encodeURIComponent(
             selectedCompany.id
           )}/level/${number}`,
           {
             replace: true,
+            state: {
+              companyId:
+                selectedCompany.id,
+              levelNumber: number,
+              role: roleFromUrl,
+              attemptId: id,
+            },
           }
         );
       } catch (error) {
@@ -1321,6 +1440,7 @@ export default function TechnicalAssessment() {
       loadingTest,
       loadAllQuestions,
       navigate,
+      roleFromUrl,
     ]
   );
 
@@ -1478,17 +1598,43 @@ export default function TechnicalAssessment() {
       return;
     }
 
-    saveAttempt({
-      attemptId,
-      companyId: company?.id,
-      levelNumber,
-      startedAt,
-      timeAllowed,
-      questions,
-      answers,
-      currentIndex,
-      violations,
-    });
+    const persist = () => {
+      saveAttempt({
+        attemptId,
+        companyId: company?.id,
+        levelNumber,
+        startedAt,
+        timeAllowed,
+        questions,
+        answers: answersRef.current,
+        currentIndex,
+        violations: violationsRef.current,
+      });
+    };
+
+    persist();
+
+    window.addEventListener(
+      "beforeunload",
+      persist
+    );
+
+    window.addEventListener(
+      "pagehide",
+      persist
+    );
+
+    return () => {
+      window.removeEventListener(
+        "beforeunload",
+        persist
+      );
+
+      window.removeEventListener(
+        "pagehide",
+        persist
+      );
+    };
   }, [
     screen,
     attemptId,
@@ -1570,7 +1716,14 @@ export default function TechnicalAssessment() {
     const fullscreenHandler =
       () => {
         if (
-          !document.fullscreenElement
+          fullscreenGraceRef.current
+        ) {
+          return;
+        }
+
+        if (
+          !document.fullscreenElement &&
+          !document.hidden
         ) {
           addViolation(
             "FULLSCREEN_EXIT",
@@ -1581,10 +1734,22 @@ export default function TechnicalAssessment() {
 
     const blurHandler =
       () => {
-        addViolation(
-          "WINDOW_BLUR",
-          "Assessment window lost focus."
-        );
+        /*
+         * Ignore transient browser/UI focus changes.
+         */
+        setTimeout(() => {
+          if (
+            document.hidden ||
+            document.hasFocus()
+          ) {
+            return;
+          }
+
+          addViolation(
+            "WINDOW_BLUR",
+            "Assessment window lost focus."
+          );
+        }, 350);
       };
 
     const contextHandler =
@@ -1625,6 +1790,16 @@ export default function TechnicalAssessment() {
           "PASTE",
           "Paste is disabled during the assessment."
         );
+      };
+
+    const dragHandler =
+      (event) => {
+        event.preventDefault();
+      };
+
+    const selectHandler =
+      (event) => {
+        event.preventDefault();
       };
 
     const keyHandler =
@@ -1694,6 +1869,16 @@ export default function TechnicalAssessment() {
     );
 
     document.addEventListener(
+      "dragstart",
+      dragHandler
+    );
+
+    document.addEventListener(
+      "selectstart",
+      selectHandler
+    );
+
+    document.addEventListener(
       "keydown",
       keyHandler,
       true
@@ -1733,6 +1918,16 @@ export default function TechnicalAssessment() {
       document.removeEventListener(
         "paste",
         pasteHandler
+      );
+
+      document.removeEventListener(
+        "dragstart",
+        dragHandler
+      );
+
+      document.removeEventListener(
+        "selectstart",
+        selectHandler
       );
 
       document.removeEventListener(
@@ -2106,23 +2301,60 @@ export default function TechnicalAssessment() {
       readResult();
 
     if (!saved) {
-      goLevels(companyId);
+      if (companyId) {
+        navigate(
+          `/technical-lab/${encodeURIComponent(
+            companyId
+          )}/levels`,
+          { replace: true }
+        );
+      } else {
+        navigate(
+          "/technical-lab",
+          { replace: true }
+        );
+      }
+
       return;
     }
 
     setResult(saved);
 
-    setSelectedCompany(
+    const resultCompanyId =
+      normalizeId(
+        firstValue(
+          saved?.companyId,
+          companyId
+        )
+      );
+
+    const fallback =
       getFallbackCompany(
-        companyId
-      )
-    );
+        resultCompanyId
+      );
+
+    const resultCompanyName =
+      firstValue(
+        saved?.companyName,
+        saved?.company?.name
+      );
+
+    setSelectedCompany({
+      ...fallback,
+      ...(resultCompanyName
+        ? {
+            name: String(
+              resultCompanyName
+            ),
+          }
+        : {}),
+    });
 
     setScreen("result");
   }, [
     isResultRoute,
     companyId,
-    goLevels,
+    navigate,
   ]);
 
   /* ==========================================================
