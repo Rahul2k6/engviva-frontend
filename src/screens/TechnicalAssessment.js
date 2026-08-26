@@ -12,246 +12,298 @@ import {
   useParams,
 } from "react-router-dom";
 
-/*
-|--------------------------------------------------------------------------
-| ENGVIVA — TECHNICAL ASSESSMENT
-|--------------------------------------------------------------------------
-|
-| FRONTEND:
-|   Hosted on Netlify
-|
-| BACKEND:
-|   https://engviva-backend.onrender.com
-|
-| IMPORTANT:
-|   Do NOT default this to localhost.
-|
-|--------------------------------------------------------------------------
-*/
-
-const API_BASE = (
+const API_BASE =
   import.meta.env.VITE_API_URL ||
-  "https://engviva-backend.onrender.com"
-).replace(/\/+$/, "");
+  "https://engviva-backend.onrender.com";
 
-/*
-|--------------------------------------------------------------------------
-| COMPANY CONFIG
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   COMPANY CONFIGURATION
+   =========================================================
+   
+   Keep these logo URLs identical to the ones used by
+   CompanyDetails.js.
+
+   If CompanyDetails already has a central company config,
+   replace these logo values with those exact values.
+========================================================= */
 
 const COMPANIES = [
   {
     id: "google",
     name: "Google",
     category: "Technology",
-    logo: "https://logo.clearbit.com/google.com",
+    logo:
+      "https://logo.clearbit.com/google.com",
   },
+
   {
     id: "microsoft",
     name: "Microsoft",
     category: "Technology",
-    logo: "https://logo.clearbit.com/microsoft.com",
+    logo:
+      "https://logo.clearbit.com/microsoft.com",
   },
+
   {
     id: "amazon",
     name: "Amazon",
     category: "Technology",
-    logo: "https://logo.clearbit.com/amazon.com",
+    logo:
+      "https://logo.clearbit.com/amazon.com",
   },
+
   {
     id: "apple",
     name: "Apple",
     category: "Technology",
-    logo: "https://logo.clearbit.com/apple.com",
+    logo:
+      "https://logo.clearbit.com/apple.com",
   },
+
   {
     id: "meta",
     name: "Meta",
     category: "Technology",
-    logo: "https://logo.clearbit.com/meta.com",
+    logo:
+      "https://logo.clearbit.com/meta.com",
   },
+
   {
     id: "nvidia",
     name: "NVIDIA",
     category: "Technology",
-    logo: "https://logo.clearbit.com/nvidia.com",
+    logo:
+      "https://logo.clearbit.com/nvidia.com",
   },
+
   {
     id: "ibm",
     name: "IBM",
     category: "Technology",
-    logo: "https://logo.clearbit.com/ibm.com",
+    logo:
+      "https://logo.clearbit.com/ibm.com",
   },
+
   {
     id: "oracle",
     name: "Oracle",
     category: "Technology",
-    logo: "https://logo.clearbit.com/oracle.com",
+    logo:
+      "https://logo.clearbit.com/oracle.com",
   },
+
   {
     id: "salesforce",
     name: "Salesforce",
     category: "Technology",
-    logo: "https://logo.clearbit.com/salesforce.com",
+    logo:
+      "https://logo.clearbit.com/salesforce.com",
   },
+
   {
     id: "adobe",
     name: "Adobe",
     category: "Technology",
-    logo: "https://logo.clearbit.com/adobe.com",
+    logo:
+      "https://logo.clearbit.com/adobe.com",
   },
+
   {
     id: "cisco",
     name: "Cisco",
     category: "Technology",
-    logo: "https://logo.clearbit.com/cisco.com",
+    logo:
+      "https://logo.clearbit.com/cisco.com",
   },
+
   {
     id: "intel",
     name: "Intel",
     category: "Technology",
-    logo: "https://logo.clearbit.com/intel.com",
+    logo:
+      "https://logo.clearbit.com/intel.com",
   },
+
   {
     id: "accenture",
     name: "Accenture",
     category: "Consulting",
-    logo: "https://logo.clearbit.com/accenture.com",
+    logo:
+      "https://logo.clearbit.com/accenture.com",
   },
+
   {
     id: "deloitte",
     name: "Deloitte",
     category: "Consulting",
-    logo: "https://logo.clearbit.com/deloitte.com",
+    logo:
+      "https://logo.clearbit.com/deloitte.com",
   },
+
   {
     id: "tcs",
     name: "TCS",
     category: "IT Services",
-    logo: "https://logo.clearbit.com/tcs.com",
+    logo:
+      "https://logo.clearbit.com/tcs.com",
   },
+
   {
     id: "infosys",
     name: "Infosys",
     category: "IT Services",
-    logo: "https://logo.clearbit.com/infosys.com",
+    logo:
+      "https://logo.clearbit.com/infosys.com",
   },
+
   {
     id: "wipro",
     name: "Wipro",
     category: "IT Services",
-    logo: "https://logo.clearbit.com/wipro.com",
+    logo:
+      "https://logo.clearbit.com/wipro.com",
   },
+
   {
     id: "hcltech",
     name: "HCLTech",
     category: "IT Services",
-    logo: "https://logo.clearbit.com/hcltech.com",
+    logo:
+      "https://logo.clearbit.com/hcltech.com",
   },
+
   {
     id: "tech-mahindra",
     name: "Tech Mahindra",
     category: "IT Services",
-    logo: "https://logo.clearbit.com/techmahindra.com",
+    logo:
+      "https://logo.clearbit.com/techmahindra.com",
   },
+
   {
     id: "cognizant",
     name: "Cognizant",
     category: "IT Services",
-    logo: "https://logo.clearbit.com/cognizant.com",
+    logo:
+      "https://logo.clearbit.com/cognizant.com",
   },
+
   {
     id: "ltimindtree",
     name: "LTIMindtree",
     category: "IT Services",
-    logo: "https://logo.clearbit.com/ltimindtree.com",
+    logo:
+      "https://logo.clearbit.com/ltimindtree.com",
   },
+
   {
     id: "persistent",
     name: "Persistent Systems",
     category: "Technology",
-    logo: "https://logo.clearbit.com/persistent.com",
+    logo:
+      "https://logo.clearbit.com/persistent.com",
   },
+
   {
     id: "zoho",
     name: "Zoho",
     category: "Technology",
-    logo: "https://logo.clearbit.com/zoho.com",
+    logo:
+      "https://logo.clearbit.com/zoho.com",
   },
+
   {
     id: "freshworks",
     name: "Freshworks",
     category: "Technology",
-    logo: "https://logo.clearbit.com/freshworks.com",
+    logo:
+      "https://logo.clearbit.com/freshworks.com",
   },
+
   {
     id: "flipkart",
     name: "Flipkart",
     category: "Technology",
-    logo: "https://logo.clearbit.com/flipkart.com",
+    logo:
+      "https://logo.clearbit.com/flipkart.com",
   },
+
   {
     id: "phonepe",
     name: "PhonePe",
     category: "Fintech",
-    logo: "https://logo.clearbit.com/phonepe.com",
+    logo:
+      "https://logo.clearbit.com/phonepe.com",
   },
+
   {
     id: "razorpay",
     name: "Razorpay",
     category: "Fintech",
-    logo: "https://logo.clearbit.com/razorpay.com",
+    logo:
+      "https://logo.clearbit.com/razorpay.com",
   },
+
   {
     id: "swiggy",
     name: "Swiggy",
     category: "Technology",
-    logo: "https://logo.clearbit.com/swiggy.com",
+    logo:
+      "https://logo.clearbit.com/swiggy.com",
   },
+
   {
     id: "zomato",
     name: "Zomato",
     category: "Technology",
-    logo: "https://logo.clearbit.com/zomato.com",
+    logo:
+      "https://logo.clearbit.com/zomato.com",
   },
+
   {
     id: "siemens",
     name: "Siemens",
     category: "Engineering",
-    logo: "https://logo.clearbit.com/siemens.com",
+    logo:
+      "https://logo.clearbit.com/siemens.com",
   },
+
   {
     id: "bosch",
     name: "Bosch",
     category: "Engineering",
-    logo: "https://logo.clearbit.com/bosch.com",
+    logo:
+      "https://logo.clearbit.com/bosch.com",
   },
+
   {
     id: "qualcomm",
     name: "Qualcomm",
     category: "Semiconductors",
-    logo: "https://logo.clearbit.com/qualcomm.com",
+    logo:
+      "https://logo.clearbit.com/qualcomm.com",
   },
+
   {
     id: "amd",
     name: "AMD",
     category: "Semiconductors",
-    logo: "https://logo.clearbit.com/amd.com",
+    logo:
+      "https://logo.clearbit.com/amd.com",
   },
+
   {
     id: "pitti-engineering",
     name: "Pitti Engineering",
     category: "Engineering",
-    logo: "https://logo.clearbit.com/pitti.in",
+    logo:
+      "https://logo.clearbit.com/pitti.in",
   },
 ];
 
-/*
-|--------------------------------------------------------------------------
-| HELPERS
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function firstValue(...values) {
   return values.find(
@@ -266,19 +318,12 @@ function safeNumber(
   value,
   fallback = 0
 ) {
-  const n = Number(value);
+  const number =
+    Number(value);
 
-  return Number.isFinite(n)
-    ? n
+  return Number.isFinite(number)
+    ? number
     : fallback;
-}
-
-function normalizeCompanyId(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 function formatTime(seconds) {
@@ -293,156 +338,169 @@ function formatTime(seconds) {
   const secs =
     value % 60;
 
-  return `${String(minutes).padStart(
-    2,
-    "0"
-  )}:${String(secs).padStart(
-    2,
-    "0"
-  )}`;
+  return `${String(
+    minutes
+  ).padStart(2, "0")}:${String(
+    secs
+  ).padStart(2, "0")}`;
 }
 
-function getCompany(companyId) {
-  const normalized =
-    normalizeCompanyId(companyId);
+function normalizeQuestions(
+  payload
+) {
+  let source = [];
 
+  if (
+    Array.isArray(payload)
+  ) {
+    source = payload;
+  } else if (
+    Array.isArray(
+      payload?.questions
+    )
+  ) {
+    source =
+      payload.questions;
+  } else if (
+    Array.isArray(
+      payload?.data?.questions
+    )
+  ) {
+    source =
+      payload.data.questions;
+  }
+
+  return source
+    .map(
+      (
+        question,
+        index
+      ) => ({
+        id:
+          firstValue(
+            question?.id,
+            question?.questionId,
+            question?._id,
+            `technical-question-${index + 1}`
+          ),
+
+        question:
+          firstValue(
+            question?.question,
+            question?.text,
+            question?.questionText,
+            `Question ${index + 1}`
+          ),
+
+        options:
+          Array.isArray(
+            question?.options
+          )
+            ? question.options.map(
+                (option) =>
+                  typeof option ===
+                  "object"
+                    ? firstValue(
+                        option?.text,
+                        option?.label,
+                        option?.value
+                      )
+                    : option
+              )
+            : [],
+
+        module:
+          firstValue(
+            question?.module,
+            question?.moduleName,
+            question?.category,
+            "Technical"
+          ),
+
+        difficulty:
+          firstValue(
+            question?.difficulty,
+            question?.level,
+            "Mixed"
+          ),
+
+        images:
+          Array.isArray(
+            question?.images
+          )
+            ? question.images
+            : [],
+
+        hasImages:
+          Boolean(
+            question?.hasImages
+          ),
+      })
+    )
+    .filter(
+      (question) =>
+        question.options.length >=
+        2
+    );
+}
+
+function normalizeCompanyId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getCompany(
+  companyId
+) {
   return (
     COMPANIES.find(
       (company) =>
-        company.id === normalized
+        company.id ===
+        String(
+          companyId
+        ).toLowerCase()
     ) || {
-      id: normalized,
+      id: companyId,
       name:
-        normalized ||
+        companyId ||
         "Engineering Company",
-      category: "Engineering",
+      category:
+        "Engineering",
       logo: "",
     }
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| QUESTION NORMALIZER
-|--------------------------------------------------------------------------
-*/
-
-function normalizeQuestion(question) {
-  if (!question) {
-    return null;
-  }
-
-  const options =
-    Array.isArray(question.options)
-      ? question.options
-          .map((option) =>
-            typeof option === "object"
-              ? firstValue(
-                  option?.text,
-                  option?.label,
-                  option?.value
-                )
-              : option
-          )
-          .filter(
-            (option) =>
-              option !== undefined &&
-              option !== null &&
-              String(option).trim() !== ""
-          )
-      : [];
-
-  if (options.length < 2) {
-    return null;
-  }
-
-  return {
-    id: String(
-      firstValue(
-        question.id,
-        question.questionId,
-        question._id
-      )
-    ),
-
-    question:
-      firstValue(
-        question.question,
-        question.text,
-        question.questionText,
-        "Technical question"
-      ),
-
-    options,
-
-    module:
-      firstValue(
-        question.module,
-        question.moduleName,
-        question.category,
-        "Technical"
-      ),
-
-    moduleId:
-      firstValue(
-        question.moduleId,
-        question.module,
-        "general"
-      ),
-
-    difficulty:
-      firstValue(
-        question.difficulty,
-        question.level,
-        "Mixed"
-      ),
-
-    images:
-      Array.isArray(question.images)
-        ? question.images
-        : [],
-
-    hasImages:
-      Boolean(question.hasImages),
-  };
-}
-
-/*
-|--------------------------------------------------------------------------
-| FIREBASE TOKEN
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   API
+========================================================= */
 
 async function firebaseToken() {
   try {
     const firebase =
-      await import("../firebase");
+      await import(
+        "../firebase"
+      );
 
     const auth =
       firebase.auth ||
       firebase.default?.auth ||
       null;
 
-    if (!auth?.currentUser) {
+    if (
+      !auth?.currentUser
+    ) {
       return null;
     }
 
     return await auth.currentUser.getIdToken();
-  } catch (error) {
-    console.error(
-      "[TECHNICAL AUTH]",
-      error
-    );
-
+  } catch {
     return null;
   }
 }
-
-/*
-|--------------------------------------------------------------------------
-| API
-|--------------------------------------------------------------------------
-*/
 
 async function apiFetch(
   path,
@@ -462,7 +520,8 @@ async function apiFetch(
         }
       : {}),
 
-    ...(options.headers || {}),
+    ...(options.headers ||
+      {}),
   };
 
   if (token) {
@@ -470,25 +529,18 @@ async function apiFetch(
       `Bearer ${token}`;
   }
 
-  const url =
-    `${API_BASE}${path}`;
-
-  console.log(
-    "[ENGVIVA TECHNICAL API]",
-    url
+  return fetch(
+    `${API_BASE}${path}`,
+    {
+      ...options,
+      headers,
+    }
   );
-
-  return fetch(url, {
-    ...options,
-    headers,
-  });
 }
 
-/*
-|--------------------------------------------------------------------------
-| MAIN COMPONENT
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   MAIN
+========================================================= */
 
 export default function TechnicalAssessment() {
   const navigate =
@@ -502,7 +554,7 @@ export default function TechnicalAssessment() {
     levelNumber: pathLevelNumber,
   } = useParams();
 
-  const query =
+  const params =
     useMemo(
       () =>
         new URLSearchParams(
@@ -511,25 +563,15 @@ export default function TechnicalAssessment() {
       [location.search]
     );
 
-  /*
-   * Supported routes:
-   *
-   * /technical-lab/google
-   * /technical-lab/google/levels
-   * /technical-lab?company=google
-   * /technical-lab?companyId=google
-   */
-
+  // Support ALL ENGVIVA Technical Lab URLs:
+  // /technical-lab?company=google
+  // /technical-lab/google
+  // /technical-lab/google/levels
+  // and router state.
   const pathnameParts =
     location.pathname
       .split("/")
       .filter(Boolean);
-
-  const pathnameCompany =
-    pathnameParts[0] ===
-    "technical-lab"
-      ? pathnameParts[1]
-      : null;
 
   const routeCompany =
     normalizeCompanyId(
@@ -537,9 +579,11 @@ export default function TechnicalAssessment() {
         pathCompanyId,
         location.state?.companyId,
         location.state?.company?.id,
-        query.get("company"),
-        query.get("companyId"),
-        pathnameCompany
+        params.get("company"),
+        params.get("companyId"),
+        pathnameParts[1] === "technical-lab"
+          ? pathnameParts[2]
+          : null
       )
     );
 
@@ -548,7 +592,7 @@ export default function TechnicalAssessment() {
       firstValue(
         pathLevelNumber,
         location.state?.levelNumber,
-        query.get("level")
+        params.get("level")
       ),
       0
     );
@@ -567,7 +611,9 @@ export default function TechnicalAssessment() {
     setSelectedCompany,
   ] = useState(
     routeCompany
-      ? getCompany(routeCompany)
+      ? getCompany(
+          routeCompany
+        )
       : null
   );
 
@@ -616,9 +662,6 @@ export default function TechnicalAssessment() {
     setAttemptId,
   ] = useState(null);
 
-  const attemptIdRef =
-    useRef(null);
-
   const [
     startedAt,
     setStartedAt,
@@ -645,9 +688,6 @@ export default function TechnicalAssessment() {
     setSubmitting,
   ] = useState(false);
 
-  const submittingRef =
-    useRef(false);
-
   const [
     result,
     setResult,
@@ -669,9 +709,9 @@ export default function TechnicalAssessment() {
   const submitRef =
     useRef(null);
 
-  /*
-   * Keep refs synchronized.
-   */
+  /* =======================================================
+     SYNC
+  ======================================================= */
 
   useEffect(() => {
     answersRef.current =
@@ -679,42 +719,43 @@ export default function TechnicalAssessment() {
   }, [answers]);
 
   useEffect(() => {
-    attemptIdRef.current =
-      attemptId;
-  }, [attemptId]);
+    remainingRef.current =
+      remainingSeconds;
+  }, [remainingSeconds]);
 
   useEffect(() => {
     startedAtRef.current =
       startedAt;
   }, [startedAt]);
 
-  useEffect(() => {
-    remainingRef.current =
-      remainingSeconds;
-  }, [remainingSeconds]);
-
-  useEffect(() => {
-    submittingRef.current =
-      submitting;
-  }, [submitting]);
-
-  /*
-   |--------------------------------------------------------------------------
-   | LOAD LEVELS
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     LOAD LEVELS
+  ======================================================= */
 
   const loadLevels =
     useCallback(
-      async (companyId) => {
+      async (
+        companyId
+      ) => {
         if (!companyId) {
           return;
         }
 
-        setLoadingLevels(true);
+        setLoadingLevels(
+          true
+        );
+
         setError("");
 
         try {
+          /*
+           * This endpoint should be the
+           * working technical company endpoint.
+           *
+           * Example:
+           * /api/technical/company/google/levels
+           */
+
           const response =
             await apiFetch(
               `/api/technical/company/${encodeURIComponent(
@@ -725,12 +766,9 @@ export default function TechnicalAssessment() {
           const payload =
             await response
               .json()
-              .catch(() => ({}));
-
-          console.log(
-            "[TECHNICAL LEVELS RESPONSE]",
-            payload
-          );
+              .catch(
+                () => ({})
+              );
 
           if (!response.ok) {
             throw new Error(
@@ -740,75 +778,74 @@ export default function TechnicalAssessment() {
             );
           }
 
-          /*
-           * ACTUAL BACKEND RESPONSE:
-           *
-           * {
-           *   success: true,
-           *   company: {...},
-           *   dataset: {...},
-           *   levelCount: 30,
-           *   levels: [...]
-           * }
-           */
+          const data =
+            payload?.data ??
+            payload;
 
+          // The backend has used more than one envelope while
+          // this feature was being developed. Accept all valid
+          // envelopes without inventing frontend question data.
           const nextLevels =
-            Array.isArray(
-              payload?.levels
-            )
+            Array.isArray(data)
+              ? data
+              : Array.isArray(data?.levels)
+              ? data.levels
+              : Array.isArray(data?.items)
+              ? data.items
+              : Array.isArray(data?.data)
+              ? data.data
+              : Array.isArray(payload?.levels)
               ? payload.levels
-              : Array.isArray(
-                  payload?.data?.levels
-                )
-              ? payload.data.levels
+              : Array.isArray(payload?.items)
+              ? payload.items
               : [];
 
+          console.log(
+            "[TECHNICAL LEVELS] Response:",
+            payload
+          );
+
+          console.log(
+            "[TECHNICAL LEVELS] Parsed level count:",
+            nextLevels.length
+          );
+
           if (!nextLevels.length) {
+            const backendMessage =
+              firstValue(
+                payload?.error,
+                payload?.message,
+                data?.error,
+                data?.message
+              );
+
             throw new Error(
-              `No technical levels were returned for ${
-                getCompany(companyId).name
-              }.`
+              backendMessage ||
+                `No technical levels are configured for ${getCompany(companyId).name}.`
             );
           }
 
           setLevels(
-            nextLevels.map(
-              (level, index) => ({
-                ...level,
-
-                level:
-                  safeNumber(
-                    level?.level ??
-                      level?.levelNumber,
-                    index + 1
-                  ),
-              })
-            )
+            nextLevels
           );
         } catch (err) {
           console.error(
-            "[TECHNICAL LEVELS ERROR]",
+            "[TECHNICAL LEVELS]",
             err
           );
-
-          setLevels([]);
 
           setError(
             err.message ||
               "Unable to load technical levels."
           );
         } finally {
-          setLoadingLevels(false);
+          setLoadingLevels(
+            false
+          );
         }
       },
       []
     );
-
-  /*
-   |--------------------------------------------------------------------------
-   | LOAD LEVELS WHEN COMPANY EXISTS
-   |--------------------------------------------------------------------------
-   */
 
   useEffect(() => {
     if (
@@ -823,11 +860,9 @@ export default function TechnicalAssessment() {
     loadLevels,
   ]);
 
-  /*
-   |--------------------------------------------------------------------------
-   | SELECT COMPANY
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     SELECT COMPANY
+  ======================================================= */
 
   const chooseCompany =
     useCallback(
@@ -842,8 +877,6 @@ export default function TechnicalAssessment() {
           null
         );
 
-        setQuestions([]);
-
         setError("");
 
         setScreen(
@@ -856,7 +889,6 @@ export default function TechnicalAssessment() {
           )}/levels`,
           {
             replace: true,
-
             state: {
               companyId:
                 company.id,
@@ -867,166 +899,36 @@ export default function TechnicalAssessment() {
       [navigate]
     );
 
-  /*
-   |--------------------------------------------------------------------------
-   | LOAD ALL QUESTIONS FOR LEVEL
-   |--------------------------------------------------------------------------
-   |
-   | Backend exposes:
-   |
-   | GET
-   | /api/technical/company/:companyId/levels/:levelNumber/questions/:questionIndex
-   |
-   | There is intentionally no bulk level-question endpoint.
-   |
-   */
-
-  const loadLevelQuestions =
-    useCallback(
-      async (
-        companyId,
-        levelNumber,
-        questionCount
-      ) => {
-        const count =
-          safeNumber(
-            questionCount
-          );
-
-        if (count <= 0) {
-          throw new Error(
-            "This technical level contains no questions."
-          );
-        }
-
-        /*
-         * Limit concurrent requests so that
-         * a 60-question level does not fire
-         * 60 requests at exactly the same moment.
-         */
-
-        const results =
-          new Array(count);
-
-        const concurrency =
-          8;
-
-        let nextIndex = 0;
-
-        async function worker() {
-          while (true) {
-            const index =
-              nextIndex++;
-
-            if (
-              index >= count
-            ) {
-              return;
-            }
-
-            const response =
-              await apiFetch(
-                `/api/technical/company/${encodeURIComponent(
-                  companyId
-                )}/levels/${levelNumber}/questions/${index}`
-              );
-
-            const payload =
-              await response
-                .json()
-                .catch(
-                  () => ({})
-                );
-
-            if (!response.ok) {
-              throw new Error(
-                payload?.error ||
-                  payload?.message ||
-                  `Unable to load question ${
-                    index + 1
-                  }.`
-              );
-            }
-
-            const rawQuestion =
-              payload?.question ||
-              payload?.data?.question ||
-              null;
-
-            const normalized =
-              normalizeQuestion(
-                rawQuestion
-              );
-
-            if (!normalized) {
-              throw new Error(
-                `Question ${
-                  index + 1
-                } is invalid or has fewer than two options.`
-              );
-            }
-
-            results[index] =
-              normalized;
-          }
-        }
-
-        await Promise.all(
-          Array.from(
-            {
-              length:
-                Math.min(
-                  concurrency,
-                  count
-                ),
-            },
-            () => worker()
-          )
-        );
-
-        return results.filter(
-          Boolean
-        );
-      },
-      []
-    );
-
-  /*
-   |--------------------------------------------------------------------------
-   | START LEVEL
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     LOAD LEVEL QUESTIONS
+  ======================================================= */
 
   const startLevel =
     useCallback(
-      async (level) => {
+      async (
+        level
+      ) => {
         if (
           !selectedCompany
         ) {
           return;
         }
 
-        const levelNumber =
-          safeNumber(
-            level?.level ??
-              level?.levelNumber
-          );
+        setLoadingTest(
+          true
+        );
 
-        if (!levelNumber) {
-          setError(
-            "Invalid technical level."
-          );
-
-          return;
-        }
-
-        setLoadingTest(true);
         setError("");
 
         try {
+          const levelNumber =
+            safeNumber(
+              level?.level ??
+                level?.levelNumber
+            );
+
           /*
-           * STEP 1
-           * Create authenticated server attempt.
+           * First create the server attempt.
            */
 
           const startResponse =
@@ -1048,7 +950,9 @@ export default function TechnicalAssessment() {
           const startPayload =
             await startResponse
               .json()
-              .catch(() => ({}));
+              .catch(
+                () => ({})
+              );
 
           if (
             !startResponse.ok
@@ -1056,7 +960,7 @@ export default function TechnicalAssessment() {
             throw new Error(
               startPayload?.error ||
                 startPayload?.message ||
-                `Unable to start technical assessment (${startResponse.status}).`
+                "Unable to start technical attempt."
             );
           }
 
@@ -1072,45 +976,66 @@ export default function TechnicalAssessment() {
 
           if (!id) {
             throw new Error(
-              "Backend started the assessment but did not return an attempt ID."
+              "Server did not return an attempt ID."
             );
           }
 
           /*
-           * STEP 2
-           * Load the actual questions.
+           * Now fetch the questions.
+           *
+           * Correct answers are intentionally
+           * NOT returned by the server.
            */
 
+          const questionResponse =
+            await apiFetch(
+              `/api/technical/company/${encodeURIComponent(
+                selectedCompany.id
+              )}/levels/${levelNumber}`
+            );
+
+          const questionPayload =
+            await questionResponse
+              .json()
+              .catch(
+                () => ({})
+              );
+
+          if (
+            !questionResponse.ok
+          ) {
+            throw new Error(
+              questionPayload?.error ||
+                questionPayload?.message ||
+                "Unable to load technical questions."
+            );
+          }
+
           const normalized =
-            await loadLevelQuestions(
-              selectedCompany.id,
-              levelNumber,
-              level?.questionCount
+            normalizeQuestions(
+              questionPayload
             );
 
           if (
             !normalized.length
           ) {
             throw new Error(
-              "This technical level returned no usable questions."
+              "This technical level has no usable questions."
             );
           }
 
-          /*
-           * STEP 3
-           * Timer.
-           */
+          const levelData =
+            questionPayload?.data ||
+            questionPayload;
 
           const durationMinutes =
-            Math.max(
-              1,
-              safeNumber(
+            safeNumber(
+              firstValue(
+                levelData?.estimatedMinutes,
                 level?.estimatedMinutes,
-                Math.ceil(
-                  normalized.length *
-                    1.5
-                )
-              )
+                60
+              ),
+              60
             );
 
           const seconds =
@@ -1122,13 +1047,9 @@ export default function TechnicalAssessment() {
               )
             );
 
-          const now =
-            new Date().toISOString();
-
-          setAttemptId(id);
-
-          attemptIdRef.current =
-            id;
+          setAttemptId(
+            id
+          );
 
           setSelectedLevel(
             levelNumber
@@ -1147,7 +1068,9 @@ export default function TechnicalAssessment() {
             0
           );
 
-          setResult(null);
+          setResult(
+            null
+          );
 
           setShowSubmit(
             false
@@ -1164,6 +1087,9 @@ export default function TechnicalAssessment() {
           remainingRef.current =
             seconds;
 
+          const now =
+            new Date().toISOString();
+
           setStartedAt(
             now
           );
@@ -1176,7 +1102,7 @@ export default function TechnicalAssessment() {
           );
         } catch (err) {
           console.error(
-            "[TECHNICAL START ERROR]",
+            "[TECHNICAL START]",
             err
           );
 
@@ -1185,20 +1111,17 @@ export default function TechnicalAssessment() {
               "Unable to start technical assessment."
           );
         } finally {
-          setLoadingTest(false);
+          setLoadingTest(
+            false
+          );
         }
       },
-      [
-        selectedCompany,
-        loadLevelQuestions,
-      ]
+      [selectedCompany]
     );
 
-  /*
-   |--------------------------------------------------------------------------
-   | TIMER
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     TIMER
+  ======================================================= */
 
   useEffect(() => {
     if (
@@ -1235,11 +1158,14 @@ export default function TechnicalAssessment() {
                 timerRef.current
               );
 
-              setTimeout(() => {
-                submitRef.current?.(
-                  true
-                );
-              }, 0);
+              setTimeout(
+                () => {
+                  submitRef.current?.(
+                    true
+                  );
+                },
+                0
+              );
             }
 
             return next;
@@ -1253,11 +1179,9 @@ export default function TechnicalAssessment() {
       );
   }, [screen]);
 
-  /*
-   |--------------------------------------------------------------------------
-   | ANSWER
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     ANSWER
+  ======================================================= */
 
   const chooseAnswer =
     useCallback(
@@ -1291,11 +1215,9 @@ export default function TechnicalAssessment() {
       [screen]
     );
 
-  /*
-   |--------------------------------------------------------------------------
-   | QUESTION NAVIGATION
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     NAVIGATION
+  ======================================================= */
 
   const nextQuestion =
     useCallback(() => {
@@ -1330,11 +1252,9 @@ export default function TechnicalAssessment() {
       []
     );
 
-  /*
-   |--------------------------------------------------------------------------
-   | SUBMIT
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     SUBMIT
+  ======================================================= */
 
   const submitAssessment =
     useCallback(
@@ -1342,26 +1262,15 @@ export default function TechnicalAssessment() {
         automatic = false
       ) => {
         if (
-          submittingRef.current
+          submitting ||
+          !attemptId
         ) {
           return;
         }
 
-        const currentAttempt =
-          attemptIdRef.current;
-
-        if (!currentAttempt) {
-          setError(
-            "No active technical attempt was found."
-          );
-
-          return;
-        }
-
-        submittingRef.current =
-          true;
-
-        setSubmitting(true);
+        setSubmitting(
+          true
+        );
 
         clearInterval(
           timerRef.current
@@ -1376,11 +1285,10 @@ export default function TechnicalAssessment() {
 
                 body:
                   JSON.stringify({
-                    attemptId:
-                      currentAttempt,
+                    attemptId,
 
                     companyId:
-                      selectedCompany?.id,
+                      selectedCompany.id,
 
                     levelNumber:
                       selectedLevel,
@@ -1413,7 +1321,9 @@ export default function TechnicalAssessment() {
           const payload =
             await response
               .json()
-              .catch(() => ({}));
+              .catch(
+                () => ({})
+              );
 
           if (
             !response.ok
@@ -1438,7 +1348,7 @@ export default function TechnicalAssessment() {
           );
         } catch (err) {
           console.error(
-            "[TECHNICAL SUBMIT ERROR]",
+            "[TECHNICAL SUBMIT]",
             err
           );
 
@@ -1451,17 +1361,16 @@ export default function TechnicalAssessment() {
             false
           );
         } finally {
-          submittingRef.current =
-            false;
-
           setSubmitting(
             false
           );
         }
       },
       [
+        attemptId,
         selectedCompany,
         selectedLevel,
+        submitting,
         timeAllowed,
       ]
     );
@@ -1469,13 +1378,13 @@ export default function TechnicalAssessment() {
   useEffect(() => {
     submitRef.current =
       submitAssessment;
-  }, [submitAssessment]);
+  }, [
+    submitAssessment,
+  ]);
 
-  /*
-   |--------------------------------------------------------------------------
-   | RETAKE
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     RETAKE
+  ======================================================= */
 
   const retake =
     useCallback(() => {
@@ -1492,7 +1401,9 @@ export default function TechnicalAssessment() {
         );
 
       if (level) {
-        startLevel(level);
+        startLevel(
+          level
+        );
       }
     }, [
       levels,
@@ -1500,11 +1411,9 @@ export default function TechnicalAssessment() {
       startLevel,
     ]);
 
-  /*
-   |--------------------------------------------------------------------------
-   | CLEANUP
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     CLEANUP
+  ======================================================= */
 
   useEffect(() => {
     return () => {
@@ -1514,11 +1423,9 @@ export default function TechnicalAssessment() {
     };
   }, []);
 
-  /*
-   |--------------------------------------------------------------------------
-   | DERIVED
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     DERIVED
+  ======================================================= */
 
   const company =
     selectedCompany ||
@@ -1562,11 +1469,9 @@ export default function TechnicalAssessment() {
         ]
       : undefined;
 
-  /*
-   |--------------------------------------------------------------------------
-   | COMPANIES
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     COMPANIES
+  ======================================================= */
 
   if (
     screen ===
@@ -1607,8 +1512,8 @@ export default function TechnicalAssessment() {
                   assessment levels.
                   Every question is
                   sourced from the
-                  verified ENGVIVA
-                  technical dataset.
+                  technical training
+                  dataset.
                 </p>
               </div>
 
@@ -1666,11 +1571,9 @@ export default function TechnicalAssessment() {
     );
   }
 
-  /*
-   |--------------------------------------------------------------------------
-   | LEVELS
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     LEVELS
+  ======================================================= */
 
   if (
     screen === "levels"
@@ -1695,8 +1598,6 @@ export default function TechnicalAssessment() {
               setSelectedCompany(
                 null
               );
-
-              setLevels([]);
 
               navigate(
                 "/technical-lab"
@@ -1790,6 +1691,12 @@ export default function TechnicalAssessment() {
                             1
                         );
 
+                      const difficulty =
+                        firstValue(
+                          level?.difficulty,
+                          "Technical"
+                        );
+
                       return (
                         <button
                           className="level-card"
@@ -1816,10 +1723,7 @@ export default function TechnicalAssessment() {
 
                           <div className="level-main">
                             <span>
-                              {firstValue(
-                                level?.difficulty,
-                                "Technical"
-                              )}
+                              {difficulty}
                             </span>
 
                             <h3>
@@ -1831,7 +1735,8 @@ export default function TechnicalAssessment() {
 
                             <p>
                               {safeNumber(
-                                level?.questionCount
+                                level?.questionCount,
+                                0
                               )}{" "}
                               questions
                               {" · "}
@@ -1849,7 +1754,8 @@ export default function TechnicalAssessment() {
                           <div className="level-meta">
                             <strong>
                               {safeNumber(
-                                level?.questionCount
+                                level?.questionCount,
+                                0
                               )}
                             </strong>
 
@@ -1880,11 +1786,9 @@ export default function TechnicalAssessment() {
     );
   }
 
-  /*
-   |--------------------------------------------------------------------------
-   | RUNNING TEST
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     RUNNING
+  ======================================================= */
 
   if (
     screen ===
@@ -2073,37 +1977,28 @@ export default function TechnicalAssessment() {
                       (
                         image,
                         index
-                      ) => {
-                        const src =
-                          typeof image ===
-                          "string"
-                            ? image
-                            : image?.source ||
-                              image?.url;
-
-                        if (!src) {
-                          return null;
-                        }
-
-                        return (
-                          <img
-                            key={
-                              index
-                            }
-                            src={src}
-                            alt={
-                              image?.alt ||
-                              "Technical question"
-                            }
-                            onError={(
-                              event
-                            ) => {
-                              event.currentTarget.style.display =
-                                "none";
-                            }}
-                          />
-                        );
-                      }
+                      ) => (
+                        <img
+                          key={
+                            index
+                          }
+                          src={
+                            image?.source ||
+                            image?.url ||
+                            image
+                          }
+                          alt={
+                            image?.alt ||
+                            "Question illustration"
+                          }
+                          onError={(
+                            event
+                          ) => {
+                            event.currentTarget.style.display =
+                              "none";
+                          }}
+                        />
+                      )
                     )}
                   </div>
                 )}
@@ -2120,7 +2015,9 @@ export default function TechnicalAssessment() {
 
                       return (
                         <button
-                          key={`${currentQuestion.id}-${index}`}
+                          key={
+                            `${currentQuestion.id}-${index}`
+                          }
                           className={
                             selected
                               ? "selected"
@@ -2237,11 +2134,9 @@ export default function TechnicalAssessment() {
     );
   }
 
-  /*
-   |--------------------------------------------------------------------------
-   | RESULT
-   |--------------------------------------------------------------------------
-   */
+  /* =======================================================
+     RESULT
+  ======================================================= */
 
   return (
     <>
@@ -2282,9 +2177,8 @@ export default function TechnicalAssessment() {
             </h1>
 
             <p>
-              Your latest technical
-              attempt has been
-              evaluated and saved.
+              Your latest attempt has
+              been evaluated and saved.
             </p>
           </div>
 
@@ -2366,20 +2260,22 @@ export default function TechnicalAssessment() {
 
           <section className="module-analysis">
             <div className="result-section-heading">
-              <span>
-                TECHNICAL ANALYSIS
-              </span>
+              <div>
+                <span>
+                  TECHNICAL ANALYSIS
+                </span>
 
-              <h2>
-                Module performance
-              </h2>
+                <h2>
+                  Module performance
+                </h2>
+              </div>
             </div>
 
             {Array.isArray(
               result?.moduleBreakdown
             ) &&
             result.moduleBreakdown
-              .length ? (
+              .length > 0 ? (
               <div className="module-list">
                 {result.moduleBreakdown.map(
                   (
@@ -2435,11 +2331,31 @@ export default function TechnicalAssessment() {
               </div>
             ) : (
               <div className="no-analysis">
-                No module analysis
-                available.
+                Module analysis will
+                appear after the server
+                finishes processing the
+                result.
               </div>
             )}
           </section>
+
+          <div className="result-note">
+            <span>
+              ✓
+            </span>
+
+            <p>
+              This is your latest technical
+              attempt for{" "}
+              <strong>
+                {company.name}
+              </strong>
+              . Retaking the same level
+              updates the latest result
+              while preserving your attempt
+              history.
+            </p>
+          </div>
 
           <div className="result-actions">
             <button
@@ -2468,11 +2384,9 @@ export default function TechnicalAssessment() {
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| COMPANY CARD
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   COMPANY CARD
+========================================================= */
 
 function CompanyCard({
   company,
@@ -2508,11 +2422,9 @@ function CompanyCard({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| COMPANY LOGO
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   COMPANY LOGO
+========================================================= */
 
 function CompanyLogo({
   company,
@@ -2541,7 +2453,9 @@ function CompanyLogo({
             company.name
           }
           onError={() =>
-            setFailed(true)
+            setFailed(
+              true
+            )
           }
         />
       ) : (
@@ -2559,11 +2473,9 @@ function CompanyLogo({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| HEADER
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   HEADER
+========================================================= */
 
 function TechnicalHeader({
   title,
@@ -2608,11 +2520,9 @@ function TechnicalHeader({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| LOADING
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   LOADING
+========================================================= */
 
 function LoadingBlock({
   text,
@@ -2648,11 +2558,9 @@ function FullscreenLoader({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| ERROR
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   ERROR
+========================================================= */
 
 function ErrorBanner({
   message,
@@ -2662,7 +2570,7 @@ function ErrorBanner({
     <div className="error-banner">
       <div>
         <strong>
-          Unable to load Technical Lab
+          Something went wrong
         </strong>
 
         <span>
@@ -2679,11 +2587,9 @@ function ErrorBanner({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| SUBMIT MODAL
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   SUBMIT MODAL
+========================================================= */
 
 function SubmitModal({
   answered,
@@ -2709,10 +2615,9 @@ function SubmitModal({
         </h2>
 
         <p>
-          Your answers will be
-          securely evaluated by
-          the ENGVIVA technical
-          engine.
+          Your answers will be sent to
+          the server for secure
+          evaluation.
         </p>
 
         <div className="modal-stats">
@@ -2781,11 +2686,9 @@ function SubmitModal({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| RESULT HELPERS
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   RESULT HELPERS
+========================================================= */
 
 function ResultMetric({
   label,
@@ -2804,31 +2707,27 @@ function ResultMetric({
   );
 }
 
-function getVerdict(score) {
-  if (score >= 90) {
+function getVerdict(
+  score
+) {
+  if (score >= 90)
     return "Exceptional technical performance";
-  }
 
-  if (score >= 80) {
+  if (score >= 80)
     return "Excellent technical performance";
-  }
 
-  if (score >= 70) {
+  if (score >= 70)
     return "Strong technical performance";
-  }
 
-  if (score >= 50) {
+  if (score >= 50)
     return "Developing technical performance";
-  }
 
   return "Keep building your technical depth";
 }
 
-/*
-|--------------------------------------------------------------------------
-| GENERAL CSS
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   GENERAL CSS
+========================================================= */
 
 const TECHNICAL_CSS = `
 * {
@@ -2868,17 +2767,16 @@ button {
   border-bottom:
     1px solid rgba(255,255,255,.07);
   background:
-    rgba(7,6,11,.92);
-  backdrop-filter:
-    blur(20px);
+    rgba(7,6,11,.88);
+  backdrop-filter: blur(20px);
   position: sticky;
   top: 0;
   z-index: 30;
 }
 
 .header-back {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 11px;
   border:
     1px solid rgba(255,255,255,.08);
@@ -2896,9 +2794,9 @@ button {
 }
 
 .engviva-mark {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   display: grid;
   place-items: center;
   background:
@@ -2941,7 +2839,7 @@ button {
 }
 
 .header-title strong {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .header-title span {
@@ -3032,7 +2930,10 @@ button {
 .company-grid {
   display: grid;
   grid-template-columns:
-    repeat(4, minmax(0, 1fr));
+    repeat(
+      4,
+      minmax(0, 1fr)
+    );
   gap: 12px;
 }
 
@@ -3104,7 +3005,8 @@ button {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #fff;
+  background:
+    #fff;
   border:
     1px solid rgba(255,255,255,.12);
   flex-shrink: 0;
@@ -3216,7 +3118,8 @@ button {
     rgba(255,255,255,.025);
   text-align: left;
   cursor: pointer;
-  transition: .18s ease;
+  transition:
+    .18s ease;
 }
 
 .level-card:hover {
@@ -3378,6 +3281,8 @@ button {
   font-size: 9px;
 }
 
+/* MODAL */
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -3510,6 +3415,8 @@ button {
   opacity: .5;
 }
 
+/* RESPONSIVE */
+
 @media (max-width: 1050px) {
   .company-grid {
     grid-template-columns:
@@ -3532,6 +3439,10 @@ button {
   .hero-block {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .hero-stat {
+    min-width: 120px;
   }
 
   .level-card {
@@ -3591,11 +3502,9 @@ button {
 }
 `;
 
-/*
-|--------------------------------------------------------------------------
-| TEST CSS
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   TEST CSS
+========================================================= */
 
 const TECHNICAL_TEST_CSS = `
 * {
@@ -3605,7 +3514,8 @@ const TECHNICAL_TEST_CSS = `
 .technical-test {
   min-height: 100vh;
   color: #f7f4fb;
-  background: #07060b;
+  background:
+    #07060b;
   font-family:
     Inter,
     ui-sans-serif,
@@ -4159,11 +4069,9 @@ const TECHNICAL_TEST_CSS = `
 }
 `;
 
-/*
-|--------------------------------------------------------------------------
-| RESULT CSS
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   RESULT CSS
+========================================================= */
 
 const RESULT_CSS = `
 * {
@@ -4429,6 +4337,41 @@ const RESULT_CSS = `
   background:
     rgba(255,255,255,.025);
   font-size: 10px;
+}
+
+.result-note {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 15px;
+  border-radius: 14px;
+  border:
+    1px solid rgba(201,167,255,.08);
+  background:
+    rgba(201,167,255,.025);
+}
+
+.result-note > span {
+  width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #c9a7ff;
+  background:
+    rgba(201,167,255,.08);
+}
+
+.result-note p {
+  margin: 0;
+  color: #726b79;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.result-note strong {
+  color: #a999ae;
 }
 
 .result-actions {
