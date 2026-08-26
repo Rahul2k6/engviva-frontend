@@ -1,5 +1,10 @@
 ﻿import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
 import SplashScreen from "./screens/SplashScreen";
 import LoginScreen from "./screens/LoginScreen";
@@ -12,14 +17,13 @@ import Companies from "./screens/Companies";
 import CompanyDetails from "./screens/CompanyDetails";
 import RolePreparation from "./screens/RolePreparation";
 
-
-
 import Practice from "./screens/Practice";
 import Assessments from "./screens/Assessments";
 import AssessmentTest from "./screens/AssessmentTest";
+
 import TechnicalAssessment from "./screens/TechnicalAssessment";
+
 import CodingLab from "./screens/CodingLab";
-import TechnicalLab from "./screens/TechnicalLab";
 
 import Interviews from "./screens/Interviews";
 import UpcomingInterviews from "./screens/UpcomingInterviews";
@@ -39,117 +43,217 @@ export default function App() {
     <BrowserRouter>
       <Routes>
 
-        {/* ENTRY */}
-        <Route path="/" element={<SplashScreen />} />
-        <Route path="/login" element={<LoginScreen />} />
+        {/* =====================================================
+            ENTRY
+        ===================================================== */}
 
-        {/* DASHBOARD */}
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route
+          path="/"
+          element={<SplashScreen />}
+        />
 
-        {/* PROFILE */}
-        <Route path="/profile-setup" element={<ProfileSetup />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route
+          path="/login"
+          element={<LoginScreen />}
+        />
 
-        {/* COMPANIES */}
-        <Route path="/companies" element={<Companies />} />
+        {/* =====================================================
+            DASHBOARD
+        ===================================================== */}
+
+        <Route
+          path="/dashboard"
+          element={<Dashboard />}
+        />
+
+        {/* =====================================================
+            PROFILE
+        ===================================================== */}
+
+        <Route
+          path="/profile-setup"
+          element={<ProfileSetup />}
+        />
+
+        <Route
+          path="/profile"
+          element={<Profile />}
+        />
+
+        {/* =====================================================
+            COMPANIES
+        ===================================================== */}
+
+        <Route
+          path="/companies"
+          element={<Companies />}
+        />
+
         <Route
           path="/companies/:companyId"
           element={<CompanyDetails />}
         />
 
-          {/* ROLESpreparation */}
+        {/* =====================================================
+            ROLE PREPARATION
+        ===================================================== */}
+
         <Route
-  path="/role-preparation"
-  element={<RolePreparation />}
-/>
+          path="/role-preparation"
+          element={<RolePreparation />}
+        />
 
-  
+        {/* =====================================================
+            PRACTICE
+        ===================================================== */}
 
-        {/* PRACTICE */}
-        <Route path="/practice" element={<Practice />} />
+        <Route
+          path="/practice"
+          element={<Practice />}
+        />
+
         <Route
           path="/practice/assessments"
           element={<Assessments />}
         />
+
         <Route
-         path="/practice/assessments/test"
-        element={<AssessmentTest />}
+          path="/practice/assessments/test"
+          element={<AssessmentTest />}
         />
 
-        <Route
-         path="/technical-lab"
-        element={
-         <TechnicalAssessment />
-             }
-          />
-
-        <Route
-          path="/technical-lab/:companyId"
-          element={
-            <TechnicalAssessment />
-          }
-        />
-
-                  <Route
-            path="/technical-lab/:companyId/level/:levelNumber"
-            element={
-              <TechnicalAssessment />
-            }
-          />
-
+        {/* =====================================================
+            CODING LAB
+        ===================================================== */}
 
         <Route
           path="/practice/coding"
           element={<CodingLab />}
         />
-       <Route
-        path="/technical-lab"
-        element={<TechnicalLab />}
-        />
+
+        {/* =====================================================
+            TECHNICAL LAB
+        ===================================================== */}
+
+        {/* Company selection */}
 
         <Route
-         path="/technical-lab/:companyId/levels"
-        element={<TechnicalLab />}
+          path="/technical-lab"
+          element={<TechnicalAssessment />}
         />
 
-        {/* INTERVIEWS */}
-        <Route path="/interviews" element={<Interviews />} />
+        {/* Company levels */}
+
+        <Route
+          path="/technical-lab/:companyId/levels"
+          element={<TechnicalAssessment />}
+        />
+
+        {/* Active proctored attempt */}
+
+        <Route
+          path="/technical-lab/:companyId/level/:levelNumber/attempt/:attemptId"
+          element={<TechnicalAssessment />}
+        />
+
+        {/* Result */}
+
+        <Route
+          path="/technical-lab/:companyId/level/:levelNumber/result"
+          element={<TechnicalAssessment />}
+        />
+
+        {/* =====================================================
+            LEGACY TECHNICAL LAB URLS
+        ===================================================== */}
+
+        <Route
+          path="/technical-lab/:companyId"
+          element={
+            <Navigate
+              to="/technical-lab"
+              replace
+            />
+          }
+        />
+
+        {/* =====================================================
+            INTERVIEWS
+        ===================================================== */}
+
+        <Route
+          path="/interviews"
+          element={<Interviews />}
+        />
+
         <Route
           path="/interviews/upcoming"
           element={<UpcomingInterviews />}
         />
+
         <Route
           path="/interviews/completed"
           element={<CompletedInterviews />}
         />
+
         <Route
           path="/interviews/:interviewId"
           element={<Interview />}
         />
 
-        {/* RESUME */}
-        <Route path="/resume" element={<Resume />} />
+        {/* =====================================================
+            RESUME
+        ===================================================== */}
 
-        {/* REPORTS */}
-        <Route path="/reports" element={<Reports />} />
+        <Route
+          path="/resume"
+          element={<Resume />}
+        />
+
+        {/* =====================================================
+            REPORTS
+        ===================================================== */}
+
+        <Route
+          path="/reports"
+          element={<Reports />}
+        />
+
         <Route
           path="/reports/:reportId"
           element={<ReportDetails />}
         />
 
-        {/* PROGRESS */}
-        <Route path="/progress" element={<Progress />} />
+        {/* =====================================================
+            PROGRESS
+        ===================================================== */}
 
-        {/* NOTIFICATIONS */}
+        <Route
+          path="/progress"
+          element={<Progress />}
+        />
+
+        {/* =====================================================
+            NOTIFICATIONS
+        ===================================================== */}
+
         <Route
           path="/notifications"
           element={<Notifications />}
         />
 
-        {/* FALLBACK */}
+        {/* =====================================================
+            GLOBAL FALLBACK
+        ===================================================== */}
+
         <Route
           path="*"
-          element={<Navigate to="/dashboard" replace />}
+          element={
+            <Navigate
+              to="/dashboard"
+              replace
+            />
+          }
         />
 
       </Routes>

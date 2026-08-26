@@ -1,2733 +1,610 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-import {
-  useLocation,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
-
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  "https://engviva-backend.onrender.com";
-
-/* =========================================================
-   COMPANY CONFIGURATION
-   =========================================================
-   
-   Keep these logo URLs identical to the ones used by
-   CompanyDetails.js.
-
-   If CompanyDetails already has a central company config,
-   replace these logo values with those exact values.
-========================================================= */
-
+const API_BASE = (import.meta.env.VITE_API_URL || "https://engviva-backend.onrender.com").replace(/\/+$/, "");
 const COMPANIES = [
-  {
-    id: "google",
-    name: "Google",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/google.com",
-  },
-
-  {
-    id: "microsoft",
-    name: "Microsoft",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/microsoft.com",
-  },
-
-  {
-    id: "amazon",
-    name: "Amazon",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/amazon.com",
-  },
-
-  {
-    id: "apple",
-    name: "Apple",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/apple.com",
-  },
-
-  {
-    id: "meta",
-    name: "Meta",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/meta.com",
-  },
-
-  {
-    id: "nvidia",
-    name: "NVIDIA",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/nvidia.com",
-  },
-
-  {
-    id: "ibm",
-    name: "IBM",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/ibm.com",
-  },
-
-  {
-    id: "oracle",
-    name: "Oracle",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/oracle.com",
-  },
-
-  {
-    id: "salesforce",
-    name: "Salesforce",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/salesforce.com",
-  },
-
-  {
-    id: "adobe",
-    name: "Adobe",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/adobe.com",
-  },
-
-  {
-    id: "cisco",
-    name: "Cisco",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/cisco.com",
-  },
-
-  {
-    id: "intel",
-    name: "Intel",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/intel.com",
-  },
-
-  {
-    id: "accenture",
-    name: "Accenture",
-    category: "Consulting",
-    logo:
-      "https://logo.clearbit.com/accenture.com",
-  },
-
-  {
-    id: "deloitte",
-    name: "Deloitte",
-    category: "Consulting",
-    logo:
-      "https://logo.clearbit.com/deloitte.com",
-  },
-
-  {
-    id: "tcs",
-    name: "TCS",
-    category: "IT Services",
-    logo:
-      "https://logo.clearbit.com/tcs.com",
-  },
-
-  {
-    id: "infosys",
-    name: "Infosys",
-    category: "IT Services",
-    logo:
-      "https://logo.clearbit.com/infosys.com",
-  },
-
-  {
-    id: "wipro",
-    name: "Wipro",
-    category: "IT Services",
-    logo:
-      "https://logo.clearbit.com/wipro.com",
-  },
-
-  {
-    id: "hcltech",
-    name: "HCLTech",
-    category: "IT Services",
-    logo:
-      "https://logo.clearbit.com/hcltech.com",
-  },
-
-  {
-    id: "tech-mahindra",
-    name: "Tech Mahindra",
-    category: "IT Services",
-    logo:
-      "https://logo.clearbit.com/techmahindra.com",
-  },
-
-  {
-    id: "cognizant",
-    name: "Cognizant",
-    category: "IT Services",
-    logo:
-      "https://logo.clearbit.com/cognizant.com",
-  },
-
-  {
-    id: "ltimindtree",
-    name: "LTIMindtree",
-    category: "IT Services",
-    logo:
-      "https://logo.clearbit.com/ltimindtree.com",
-  },
-
-  {
-    id: "persistent",
-    name: "Persistent Systems",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/persistent.com",
-  },
-
-  {
-    id: "zoho",
-    name: "Zoho",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/zoho.com",
-  },
-
-  {
-    id: "freshworks",
-    name: "Freshworks",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/freshworks.com",
-  },
-
-  {
-    id: "flipkart",
-    name: "Flipkart",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/flipkart.com",
-  },
-
-  {
-    id: "phonepe",
-    name: "PhonePe",
-    category: "Fintech",
-    logo:
-      "https://logo.clearbit.com/phonepe.com",
-  },
-
-  {
-    id: "razorpay",
-    name: "Razorpay",
-    category: "Fintech",
-    logo:
-      "https://logo.clearbit.com/razorpay.com",
-  },
-
-  {
-    id: "swiggy",
-    name: "Swiggy",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/swiggy.com",
-  },
-
-  {
-    id: "zomato",
-    name: "Zomato",
-    category: "Technology",
-    logo:
-      "https://logo.clearbit.com/zomato.com",
-  },
-
-  {
-    id: "siemens",
-    name: "Siemens",
-    category: "Engineering",
-    logo:
-      "https://logo.clearbit.com/siemens.com",
-  },
-
-  {
-    id: "bosch",
-    name: "Bosch",
-    category: "Engineering",
-    logo:
-      "https://logo.clearbit.com/bosch.com",
-  },
-
-  {
-    id: "qualcomm",
-    name: "Qualcomm",
-    category: "Semiconductors",
-    logo:
-      "https://logo.clearbit.com/qualcomm.com",
-  },
-
-  {
-    id: "amd",
-    name: "AMD",
-    category: "Semiconductors",
-    logo:
-      "https://logo.clearbit.com/amd.com",
-  },
-
-  {
-    id: "pitti-engineering",
-    name: "Pitti Engineering",
-    category: "Engineering",
-    logo:
-      "https://logo.clearbit.com/pitti.in",
-  },
+  {id:"google",name:"Google",category:"Technology",logo:"https://logo.clearbit.com/google.com"},
+  {id:"microsoft",name:"Microsoft",category:"Technology",logo:"https://logo.clearbit.com/microsoft.com"},
+  {id:"amazon",name:"Amazon",category:"Technology",logo:"https://logo.clearbit.com/amazon.com"},
+  {id:"apple",name:"Apple",category:"Technology",logo:"https://logo.clearbit.com/apple.com"},
+  {id:"meta",name:"Meta",category:"Technology",logo:"https://logo.clearbit.com/meta.com"},
+  {id:"nvidia",name:"NVIDIA",category:"Technology",logo:"https://logo.clearbit.com/nvidia.com"},
+  {id:"ibm",name:"IBM",category:"Technology",logo:"https://logo.clearbit.com/ibm.com"},
+  {id:"oracle",name:"Oracle",category:"Technology",logo:"https://logo.clearbit.com/oracle.com"},
+  {id:"salesforce",name:"Salesforce",category:"Technology",logo:"https://logo.clearbit.com/salesforce.com"},
+  {id:"adobe",name:"Adobe",category:"Technology",logo:"https://logo.clearbit.com/adobe.com"},
+  {id:"cisco",name:"Cisco",category:"Technology",logo:"https://logo.clearbit.com/cisco.com"},
+  {id:"intel",name:"Intel",category:"Technology",logo:"https://logo.clearbit.com/intel.com"},
+  {id:"accenture",name:"Accenture",category:"Consulting",logo:"https://logo.clearbit.com/accenture.com"},
+  {id:"deloitte",name:"Deloitte",category:"Consulting",logo:"https://logo.clearbit.com/deloitte.com"},
+  {id:"tcs",name:"TCS",category:"IT Services",logo:"https://logo.clearbit.com/tcs.com"},
+  {id:"infosys",name:"Infosys",category:"IT Services",logo:"https://logo.clearbit.com/infosys.com"},
+  {id:"wipro",name:"Wipro",category:"IT Services",logo:"https://logo.clearbit.com/wipro.com"},
+  {id:"hcltech",name:"HCLTech",category:"IT Services",logo:"https://logo.clearbit.com/hcltech.com"},
+  {id:"tech-mahindra",name:"Tech Mahindra",category:"IT Services",logo:"https://logo.clearbit.com/techmahindra.com"},
+  {id:"cognizant",name:"Cognizant",category:"IT Services",logo:"https://logo.clearbit.com/cognizant.com"},
+  {id:"ltimindtree",name:"LTIMindtree",category:"IT Services",logo:"https://logo.clearbit.com/ltimindtree.com"},
+  {id:"persistent",name:"Persistent Systems",category:"Technology",logo:"https://logo.clearbit.com/persistent.com"},
+  {id:"zoho",name:"Zoho",category:"Technology",logo:"https://logo.clearbit.com/zoho.com"},
+  {id:"freshworks",name:"Freshworks",category:"Technology",logo:"https://logo.clearbit.com/freshworks.com"},
+  {id:"flipkart",name:"Flipkart",category:"Technology",logo:"https://logo.clearbit.com/flipkart.com"},
+  {id:"phonepe",name:"PhonePe",category:"Fintech",logo:"https://logo.clearbit.com/phonepe.com"},
+  {id:"razorpay",name:"Razorpay",category:"Fintech",logo:"https://logo.clearbit.com/razorpay.com"},
+  {id:"swiggy",name:"Swiggy",category:"Technology",logo:"https://logo.clearbit.com/swiggy.com"},
+  {id:"zomato",name:"Zomato",category:"Technology",logo:"https://logo.clearbit.com/zomato.com"},
+  {id:"siemens",name:"Siemens",category:"Engineering",logo:"https://logo.clearbit.com/siemens.com"},
+  {id:"bosch",name:"Bosch",category:"Engineering",logo:"https://logo.clearbit.com/bosch.com"},
+  {id:"qualcomm",name:"Qualcomm",category:"Semiconductors",logo:"https://logo.clearbit.com/qualcomm.com"},
+  {id:"amd",name:"AMD",category:"Semiconductors",logo:"https://logo.clearbit.com/amd.com"},
+  {id:"pitti-engineering",name:"Pitti Engineering",category:"Engineering",logo:"https://logo.clearbit.com/pitti.in"}
 ];
 
-/* =========================================================
-   HELPERS
-========================================================= */
+const PROCTOR_LIMIT = 5;
+const STORAGE_KEY = "engviva:technical:active-attempt";
 
 function firstValue(...values) {
-  return values.find(
-    (value) =>
-      value !== undefined &&
-      value !== null &&
-      value !== ""
-  );
+  return values.find(v => v !== undefined && v !== null && v !== "");
 }
-
-function safeNumber(
-  value,
-  fallback = 0
-) {
-  const number =
-    Number(value);
-
-  return Number.isFinite(number)
-    ? number
-    : fallback;
+function safeNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 }
-
 function formatTime(seconds) {
-  const value = Math.max(
-    0,
-    safeNumber(seconds)
-  );
-
-  const minutes =
-    Math.floor(value / 60);
-
-  const secs =
-    value % 60;
-
-  return `${String(
-    minutes
-  ).padStart(2, "0")}:${String(
-    secs
-  ).padStart(2, "0")}`;
+  const value = Math.max(0, Math.floor(safeNumber(seconds)));
+  return `${String(Math.floor(value / 60)).padStart(2,"0")}:${String(value % 60).padStart(2,"0")}`;
 }
-
-function normalizeQuestions(
-  payload
-) {
-  let source = [];
-
-  if (
-    Array.isArray(payload)
-  ) {
-    source = payload;
-  } else if (
-    Array.isArray(
-      payload?.questions
-    )
-  ) {
-    source =
-      payload.questions;
-  } else if (
-    Array.isArray(
-      payload?.data?.questions
-    )
-  ) {
-    source =
-      payload.data.questions;
-  }
-
-  return source
-    .map(
-      (
-        question,
-        index
-      ) => ({
-        id:
-          firstValue(
-            question?.id,
-            question?.questionId,
-            question?._id,
-            `technical-question-${index + 1}`
-          ),
-
-        question:
-          firstValue(
-            question?.question,
-            question?.text,
-            question?.questionText,
-            `Question ${index + 1}`
-          ),
-
-        options:
-          Array.isArray(
-            question?.options
-          )
-            ? question.options.map(
-                (option) =>
-                  typeof option ===
-                  "object"
-                    ? firstValue(
-                        option?.text,
-                        option?.label,
-                        option?.value
-                      )
-                    : option
-              )
-            : [],
-
-        module:
-          firstValue(
-            question?.module,
-            question?.moduleName,
-            question?.category,
-            "Technical"
-          ),
-
-        difficulty:
-          firstValue(
-            question?.difficulty,
-            question?.level,
-            "Mixed"
-          ),
-
-        images:
-          Array.isArray(
-            question?.images
-          )
-            ? question.images
-            : [],
-
-        hasImages:
-          Boolean(
-            question?.hasImages
-          ),
-      })
-    )
-    .filter(
-      (question) =>
-        question.options.length >=
-        2
-    );
-}
-
 function normalizeCompanyId(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
 }
-
-function getCompany(
-  companyId
-) {
-  return (
-    COMPANIES.find(
-      (company) =>
-        company.id ===
-        String(
-          companyId
-        ).toLowerCase()
-    ) || {
-      id: companyId,
-      name:
-        companyId ||
-        "Engineering Company",
-      category:
-        "Engineering",
-      logo: "",
-    }
-  );
+function getCompany(companyId) {
+  return COMPANIES.find(c => c.id === normalizeCompanyId(companyId)) || {
+    id: normalizeCompanyId(companyId), name: companyId || "Engineering Company",
+    category: "Engineering", logo: ""
+  };
 }
-
-/* =========================================================
-   API
-========================================================= */
+function normalizeQuestions(payload) {
+  const data = payload?.data ?? payload;
+  const source = Array.isArray(data) ? data :
+    Array.isArray(data?.questions) ? data.questions :
+    Array.isArray(payload?.questions) ? payload.questions : [];
+  return source.map((q,i) => ({
+    id: String(firstValue(q?.id,q?.questionId,q?._id,`technical-question-${i+1}`)),
+    question: String(firstValue(q?.question,q?.text,q?.questionText,`Question ${i+1}`)),
+    options: Array.isArray(q?.options) ? q.options.map(o =>
+      typeof o === "object" ? String(firstValue(o?.text,o?.label,o?.value,"")) : String(o)
+    ) : [],
+    module: String(firstValue(q?.module,q?.moduleName,q?.category,"Technical")),
+    difficulty: String(firstValue(q?.difficulty,q?.level,"Mixed")),
+    images: Array.isArray(q?.images) ? q.images : []
+  })).filter(q => q.options.length >= 2);
+}
 
 async function firebaseToken() {
   try {
-    const firebase =
-      await import(
-        "../firebase"
-      );
-
-    const auth =
-      firebase.auth ||
-      firebase.default?.auth ||
-      null;
-
-    if (
-      !auth?.currentUser
-    ) {
-      return null;
-    }
-
-    return await auth.currentUser.getIdToken();
+    const firebase = await import("../firebase");
+    const auth = firebase.auth || firebase.default?.auth;
+    return auth?.currentUser ? await auth.currentUser.getIdToken() : null;
   } catch {
     return null;
   }
 }
 
-async function apiFetch(
-  path,
-  options = {}
-) {
-  const token =
-    await firebaseToken();
-
+async function apiFetch(path, options = {}) {
+  const token = await firebaseToken();
   const headers = {
-    Accept:
-      "application/json",
-
-    ...(options.body
-      ? {
-          "Content-Type":
-            "application/json",
-        }
-      : {}),
-
-    ...(options.headers ||
-      {}),
+    Accept: "application/json",
+    ...(options.body ? {"Content-Type":"application/json"} : {}),
+    ...(options.headers || {})
   };
-
-  if (token) {
-    headers.Authorization =
-      `Bearer ${token}`;
-  }
-
-  return fetch(
-    `${API_BASE}${path}`,
-    {
-      ...options,
-      headers,
-    }
-  );
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(`${API_BASE}${path}`, {...options, headers});
 }
 
-/* =========================================================
-   MAIN
-========================================================= */
+function readStoredAttempt() {
+  try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "null"); }
+  catch { return null; }
+}
+function storeAttempt(value) {
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value)); } catch {}
+}
+function clearStoredAttempt() {
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+}
+async function requestFullscreen() {
+  try {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch {}
+}
+async function exitFullscreen() {
+  try {
+    if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+  } catch {}
+}
 
 export default function TechnicalAssessment() {
-  const navigate =
-    useNavigate();
-
-  const location =
-    useLocation();
-
-  const {
-    companyId: pathCompanyId,
-    levelNumber: pathLevelNumber,
-  } = useParams();
-
-  const params =
-    useMemo(
-      () =>
-        new URLSearchParams(
-          location.search
-        ),
-      [location.search]
-    );
-
-  // Support ALL ENGVIVA Technical Lab URLs:
-  // /technical-lab?company=google
-  // /technical-lab/google
-  // /technical-lab/google/levels
-  // and router state.
-  const pathnameParts =
-    location.pathname
-      .split("/")
-      .filter(Boolean);
-
-  const routeCompany =
-    normalizeCompanyId(
-      firstValue(
-        pathCompanyId,
-        location.state?.companyId,
-        location.state?.company?.id,
-        params.get("company"),
-        params.get("companyId"),
-        pathnameParts[1] === "technical-lab"
-          ? pathnameParts[2]
-          : null
-      )
-    );
-
-  const routeLevel =
-    safeNumber(
-      firstValue(
-        pathLevelNumber,
-        location.state?.levelNumber,
-        params.get("level")
-      ),
-      0
-    );
-
-  const [
-    screen,
-    setScreen,
-  ] = useState(
-    routeCompany
-      ? "levels"
-      : "companies"
-  );
-
-  const [
-    selectedCompany,
-    setSelectedCompany,
-  ] = useState(
-    routeCompany
-      ? getCompany(
-          routeCompany
-        )
-      : null
-  );
-
-  const [
-    levels,
-    setLevels,
-  ] = useState([]);
-
-  const [
-    loadingLevels,
-    setLoadingLevels,
-  ] = useState(false);
-
-  const [
-    selectedLevel,
-    setSelectedLevel,
-  ] = useState(
-    routeLevel || null
-  );
-
-  const [
-    questions,
-    setQuestions,
-  ] = useState([]);
-
-  const [
-    currentIndex,
-    setCurrentIndex,
-  ] = useState(0);
-
-  const [
-    answers,
-    setAnswers,
-  ] = useState({});
-
-  const answersRef =
-    useRef({});
-
-  const [
-    loadingTest,
-    setLoadingTest,
-  ] = useState(false);
-
-  const [
-    attemptId,
-    setAttemptId,
-  ] = useState(null);
-
-  const [
-    startedAt,
-    setStartedAt,
-  ] = useState(null);
-
-  const startedAtRef =
-    useRef(null);
-
-  const [
-    remainingSeconds,
-    setRemainingSeconds,
-  ] = useState(0);
-
-  const remainingRef =
-    useRef(0);
-
-  const [
-    timeAllowed,
-    setTimeAllowed,
-  ] = useState(0);
-
-  const [
-    submitting,
-    setSubmitting,
-  ] = useState(false);
-
-  const [
-    result,
-    setResult,
-  ] = useState(null);
-
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  const [
-    showSubmit,
-    setShowSubmit,
-  ] = useState(false);
-
-  const timerRef =
-    useRef(null);
-
-  const submitRef =
-    useRef(null);
-
-  /* =======================================================
-     SYNC
-  ======================================================= */
-
-  useEffect(() => {
-    answersRef.current =
-      answers;
-  }, [answers]);
-
-  useEffect(() => {
-    remainingRef.current =
-      remainingSeconds;
-  }, [remainingSeconds]);
-
-  useEffect(() => {
-    startedAtRef.current =
-      startedAt;
-  }, [startedAt]);
-
-  /* =======================================================
-     LOAD LEVELS
-  ======================================================= */
-
-  const loadLevels =
-    useCallback(
-      async (
-        companyId
-      ) => {
-        if (!companyId) {
-          return;
-        }
-
-        setLoadingLevels(
-          true
-        );
-
-        setError("");
-
-        try {
-          /*
-           * This endpoint should be the
-           * working technical company endpoint.
-           *
-           * Example:
-           * /api/technical/company/google/levels
-           */
-
-          const response =
-            await apiFetch(
-              `/api/technical/company/${encodeURIComponent(
-                companyId
-              )}/levels`
-            );
-
-          const payload =
-            await response
-              .json()
-              .catch(
-                () => ({})
-              );
-
-          if (!response.ok) {
-            throw new Error(
-              payload?.error ||
-                payload?.message ||
-                `Unable to load technical levels (${response.status}).`
-            );
-          }
-
-          const data =
-            payload?.data ??
-            payload;
-
-          // The backend has used more than one envelope while
-          // this feature was being developed. Accept all valid
-          // envelopes without inventing frontend question data.
-          const nextLevels =
-            Array.isArray(data)
-              ? data
-              : Array.isArray(data?.levels)
-              ? data.levels
-              : Array.isArray(data?.items)
-              ? data.items
-              : Array.isArray(data?.data)
-              ? data.data
-              : Array.isArray(payload?.levels)
-              ? payload.levels
-              : Array.isArray(payload?.items)
-              ? payload.items
-              : [];
-
-          console.log(
-            "[TECHNICAL LEVELS] Response:",
-            payload
-          );
-
-          console.log(
-            "[TECHNICAL LEVELS] Parsed level count:",
-            nextLevels.length
-          );
-
-          if (!nextLevels.length) {
-            const backendMessage =
-              firstValue(
-                payload?.error,
-                payload?.message,
-                data?.error,
-                data?.message
-              );
-
-            throw new Error(
-              backendMessage ||
-                `No technical levels are configured for ${getCompany(companyId).name}.`
-            );
-          }
-
-          setLevels(
-            nextLevels
-          );
-        } catch (err) {
-          console.error(
-            "[TECHNICAL LEVELS]",
-            err
-          );
-
-          setError(
-            err.message ||
-              "Unable to load technical levels."
-          );
-        } finally {
-          setLoadingLevels(
-            false
-          );
-        }
-      },
-      []
-    );
-
-  useEffect(() => {
-    if (
-      selectedCompany?.id
-    ) {
-      loadLevels(
-        selectedCompany.id
-      );
-    }
-  }, [
-    selectedCompany,
-    loadLevels,
-  ]);
-
-  /* =======================================================
-     SELECT COMPANY
-  ======================================================= */
-
-  const chooseCompany =
-    useCallback(
-      (company) => {
-        setSelectedCompany(
-          company
-        );
-
-        setLevels([]);
-
-        setSelectedLevel(
-          null
-        );
-
-        setError("");
-
-        setScreen(
-          "levels"
-        );
-
-        navigate(
-          `/technical-lab/${encodeURIComponent(
-            company.id
-          )}/levels`,
-          {
-            replace: true,
-            state: {
-              companyId:
-                company.id,
-            },
-          }
-        );
-      },
-      [navigate]
-    );
-
-  /* =======================================================
-     LOAD LEVEL QUESTIONS
-  ======================================================= */
-
-  const startLevel =
-    useCallback(
-      async (
-        level
-      ) => {
-        if (
-          !selectedCompany
-        ) {
-          return;
-        }
-
-        setLoadingTest(
-          true
-        );
-
-        setError("");
-
-        try {
-          const levelNumber =
-            safeNumber(
-              level?.level ??
-                level?.levelNumber
-            );
-
-          /*
-           * First create the server attempt.
-           */
-
-          const startResponse =
-            await apiFetch(
-              "/api/technical/assessment/start",
-              {
-                method: "POST",
-
-                body:
-                  JSON.stringify({
-                    companyId:
-                      selectedCompany.id,
-
-                    levelNumber,
-                  }),
-              }
-            );
-
-          const startPayload =
-            await startResponse
-              .json()
-              .catch(
-                () => ({})
-              );
-
-          if (
-            !startResponse.ok
-          ) {
-            throw new Error(
-              startPayload?.error ||
-                startPayload?.message ||
-                "Unable to start technical attempt."
-            );
-          }
-
-          const attempt =
-            startPayload?.data ||
-            startPayload;
-
-          const id =
-            firstValue(
-              attempt?.attemptId,
-              startPayload?.attemptId
-            );
-
-          if (!id) {
-            throw new Error(
-              "Server did not return an attempt ID."
-            );
-          }
-
-          /*
-           * Now fetch the questions.
-           *
-           * Correct answers are intentionally
-           * NOT returned by the server.
-           */
-
-          const questionResponse =
-            await apiFetch(
-              `/api/technical/company/${encodeURIComponent(
-                selectedCompany.id
-              )}/levels/${levelNumber}`
-            );
-
-          const questionPayload =
-            await questionResponse
-              .json()
-              .catch(
-                () => ({})
-              );
-
-          if (
-            !questionResponse.ok
-          ) {
-            throw new Error(
-              questionPayload?.error ||
-                questionPayload?.message ||
-                "Unable to load technical questions."
-            );
-          }
-
-          const normalized =
-            normalizeQuestions(
-              questionPayload
-            );
-
-          if (
-            !normalized.length
-          ) {
-            throw new Error(
-              "This technical level has no usable questions."
-            );
-          }
-
-          const levelData =
-            questionPayload?.data ||
-            questionPayload;
-
-          const durationMinutes =
-            safeNumber(
-              firstValue(
-                levelData?.estimatedMinutes,
-                level?.estimatedMinutes,
-                60
-              ),
-              60
-            );
-
-          const seconds =
-            Math.max(
-              60,
-              Math.round(
-                durationMinutes *
-                  60
-              )
-            );
-
-          setAttemptId(
-            id
-          );
-
-          setSelectedLevel(
-            levelNumber
-          );
-
-          setQuestions(
-            normalized
-          );
-
-          setAnswers({});
-
-          answersRef.current =
-            {};
-
-          setCurrentIndex(
-            0
-          );
-
-          setResult(
-            null
-          );
-
-          setShowSubmit(
-            false
-          );
-
-          setTimeAllowed(
-            seconds
-          );
-
-          setRemainingSeconds(
-            seconds
-          );
-
-          remainingRef.current =
-            seconds;
-
-          const now =
-            new Date().toISOString();
-
-          setStartedAt(
-            now
-          );
-
-          startedAtRef.current =
-            now;
-
-          setScreen(
-            "running"
-          );
-        } catch (err) {
-          console.error(
-            "[TECHNICAL START]",
-            err
-          );
-
-          setError(
-            err.message ||
-              "Unable to start technical assessment."
-          );
-        } finally {
-          setLoadingTest(
-            false
-          );
-        }
-      },
-      [selectedCompany]
-    );
-
-  /* =======================================================
-     TIMER
-  ======================================================= */
-
-  useEffect(() => {
-    if (
-      screen !== "running"
-    ) {
-      clearInterval(
-        timerRef.current
-      );
-
-      return;
-    }
-
-    clearInterval(
-      timerRef.current
-    );
-
-    timerRef.current =
-      setInterval(() => {
-        setRemainingSeconds(
-          (previous) => {
-            const next =
-              Math.max(
-                0,
-                previous - 1
-              );
-
-            remainingRef.current =
-              next;
-
-            if (
-              next === 0
-            ) {
-              clearInterval(
-                timerRef.current
-              );
-
-              setTimeout(
-                () => {
-                  submitRef.current?.(
-                    true
-                  );
-                },
-                0
-              );
-            }
-
-            return next;
-          }
-        );
-      }, 1000);
-
-    return () =>
-      clearInterval(
-        timerRef.current
-      );
-  }, [screen]);
-
-  /* =======================================================
-     ANSWER
-  ======================================================= */
-
-  const chooseAnswer =
-    useCallback(
-      (
-        questionId,
-        optionIndex
-      ) => {
-        if (
-          screen !==
-          "running"
-        ) {
-          return;
-        }
-
-        setAnswers(
-          (previous) => {
-            const next = {
-              ...previous,
-
-              [questionId]:
-                optionIndex,
-            };
-
-            answersRef.current =
-              next;
-
-            return next;
-          }
-        );
-      },
-      [screen]
-    );
-
-  /* =======================================================
-     NAVIGATION
-  ======================================================= */
-
-  const nextQuestion =
-    useCallback(() => {
-      setCurrentIndex(
-        (current) =>
-          Math.min(
-            questions.length -
-              1,
-            current + 1
-          )
-      );
-    }, [questions.length]);
-
-  const previousQuestion =
-    useCallback(() => {
-      setCurrentIndex(
-        (current) =>
-          Math.max(
-            0,
-            current - 1
-          )
-      );
-    }, []);
-
-  const jumpQuestion =
-    useCallback(
-      (index) => {
-        setCurrentIndex(
-          index
-        );
-      },
-      []
-    );
-
-  /* =======================================================
-     SUBMIT
-  ======================================================= */
-
-  const submitAssessment =
-    useCallback(
-      async (
-        automatic = false
-      ) => {
-        if (
-          submitting ||
-          !attemptId
-        ) {
-          return;
-        }
-
-        setSubmitting(
-          true
-        );
-
-        clearInterval(
-          timerRef.current
-        );
-
-        try {
-          const response =
-            await apiFetch(
-              "/api/technical/assessment/submit",
-              {
-                method: "POST",
-
-                body:
-                  JSON.stringify({
-                    attemptId,
-
-                    companyId:
-                      selectedCompany.id,
-
-                    levelNumber:
-                      selectedLevel,
-
-                    answers:
-                      answersRef.current,
-
-                    startedAt:
-                      startedAtRef.current,
-
-                    completedAt:
-                      new Date().toISOString(),
-
-                    timeAllowedSeconds:
-                      timeAllowed,
-
-                    timeUsedSeconds:
-                      Math.max(
-                        0,
-                        timeAllowed -
-                          remainingRef.current
-                      ),
-
-                    automaticSubmission:
-                      automatic,
-                  }),
-              }
-            );
-
-          const payload =
-            await response
-              .json()
-              .catch(
-                () => ({})
-              );
-
-          if (
-            !response.ok
-          ) {
-            throw new Error(
-              payload?.error ||
-                payload?.message ||
-                `Technical submission failed (${response.status}).`
-            );
-          }
-
-          const data =
-            payload?.data ||
-            payload;
-
-          setResult(
-            data
-          );
-
-          setScreen(
-            "result"
-          );
-        } catch (err) {
-          console.error(
-            "[TECHNICAL SUBMIT]",
-            err
-          );
-
-          setError(
-            err.message ||
-              "Unable to submit technical assessment."
-          );
-
-          setShowSubmit(
-            false
-          );
-        } finally {
-          setSubmitting(
-            false
-          );
-        }
-      },
-      [
-        attemptId,
-        selectedCompany,
-        selectedLevel,
-        submitting,
-        timeAllowed,
-      ]
-    );
-
-  useEffect(() => {
-    submitRef.current =
-      submitAssessment;
-  }, [
-    submitAssessment,
-  ]);
-
-  /* =======================================================
-     RETAKE
-  ======================================================= */
-
-  const retake =
-    useCallback(() => {
-      const level =
-        levels.find(
-          (item) =>
-            safeNumber(
-              item?.level ??
-                item?.levelNumber
-            ) ===
-            Number(
-              selectedLevel
-            )
-        );
-
-      if (level) {
-        startLevel(
-          level
-        );
-      }
-    }, [
-      levels,
-      selectedLevel,
-      startLevel,
-    ]);
-
-  /* =======================================================
-     CLEANUP
-  ======================================================= */
-
-  useEffect(() => {
-    return () => {
-      clearInterval(
-        timerRef.current
-      );
-    };
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
+
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const routeCompanyId = normalizeCompanyId(firstValue(
+    params.companyId, query.get("company"), query.get("companyId")
+  ));
+  const routeLevel = safeNumber(firstValue(params.levelNumber, query.get("level")), 0);
+  const routeAttemptId = firstValue(params.attemptId, query.get("attemptId"));
+
+  const [screen, setScreen] = useState(routeAttemptId ? "running" : routeLevel ? "levels" : routeCompanyId ? "levels" : "companies");
+  const [selectedCompany, setSelectedCompany] = useState(routeCompanyId ? getCompany(routeCompanyId) : null);
+  const [levels, setLevels] = useState([]);
+  const [selectedLevel, setSelectedLevel] = useState(routeLevel || null);
+  const [questions, setQuestions] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const answersRef = useRef({});
+  const [attemptId, setAttemptId] = useState(routeAttemptId || null);
+  const [startedAt, setStartedAt] = useState(null);
+  const startedAtRef = useRef(null);
+  const [timeAllowed, setTimeAllowed] = useState(0);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const remainingRef = useRef(0);
+  const [loadingLevels, setLoadingLevels] = useState(false);
+  const [loadingTest, setLoadingTest] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [showSubmit, setShowSubmit] = useState(false);
+  const [violations, setViolations] = useState([]);
+  const [proctorWarning, setProctorWarning] = useState("");
+  const [proctorLocked, setProctorLocked] = useState(false);
+  const timerRef = useRef(null);
+  const submitRef = useRef(null);
+  const violationLockRef = useRef(false);
+
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+  useEffect(() => { remainingRef.current = remainingSeconds; }, [remainingSeconds]);
+  useEffect(() => { startedAtRef.current = startedAt; }, [startedAt]);
+  useEffect(() => { submittingRef.current = submitting; }, [submitting]);
+
+  const canonicalCompany = selectedCompany?.id || routeCompanyId;
+  const company = selectedCompany || getCompany(canonicalCompany);
+
+  const goCompanies = useCallback(() => {
+    clearStoredAttempt();
+    setSelectedCompany(null); setSelectedLevel(null); setLevels([]); setError("");
+    setScreen("companies");
+    navigate("/technical-lab", {replace:true});
+  }, [navigate]);
+
+  const goLevels = useCallback((companyId = canonicalCompany) => {
+    const id = normalizeCompanyId(companyId);
+    if (!id) return goCompanies();
+    const c = getCompany(id);
+    clearStoredAttempt();
+    setSelectedCompany(c); setSelectedLevel(null); setQuestions([]); setResult(null); setError("");
+    setScreen("levels");
+    navigate(`/technical-lab/${encodeURIComponent(id)}/levels`, {replace:true});
+  }, [canonicalCompany, goCompanies, navigate]);
+
+  const loadLevels = useCallback(async companyId => {
+    if (!companyId) return;
+    setLoadingLevels(true); setError("");
+    try {
+      const response = await apiFetch(`/api/technical/company/${encodeURIComponent(companyId)}/levels`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || payload?.message || `Unable to load levels (${response.status}).`);
+      const data = payload?.data ?? payload;
+      const parsed = Array.isArray(data) ? data :
+        Array.isArray(data?.levels) ? data.levels :
+        Array.isArray(data?.items) ? data.items : [];
+      if (!parsed.length) throw new Error(`No technical levels are configured for ${getCompany(companyId).name}.`);
+      setLevels(parsed);
+    } catch (e) {
+      console.error("[TECHNICAL LEVELS]", e);
+      setError(e.message || "Unable to load technical levels.");
+    } finally { setLoadingLevels(false); }
   }, []);
 
-  /* =======================================================
-     DERIVED
-  ======================================================= */
-
-  const company =
-    selectedCompany ||
-    getCompany(
-      routeCompany
-    );
-
-  const currentQuestion =
-    questions[
-      currentIndex
-    ];
-
-  const answeredCount =
-    questions.filter(
-      (question) =>
-        answers[
-          question.id
-        ] !== undefined
-    ).length;
-
-  const unansweredCount =
-    Math.max(
-      0,
-      questions.length -
-        answeredCount
-    );
-
-  const progress =
-    questions.length
-      ? Math.round(
-          (answeredCount /
-            questions.length) *
-            100
-        )
-      : 0;
-
-  const currentAnswer =
-    currentQuestion
-      ? answers[
-          currentQuestion.id
-        ]
-      : undefined;
-
-  /* =======================================================
-     COMPANIES
-  ======================================================= */
-
-  if (
-    screen ===
-    "companies"
-  ) {
-    return (
-      <>
-        <style>
-          {TECHNICAL_CSS}
-        </style>
-
-        <div className="technical-page">
-          <TechnicalHeader
-            title="Technical Lab"
-            subtitle="Company-specific engineering assessments"
-            onBack={() =>
-              navigate(
-                "/dashboard"
-              )
-            }
-          />
-
-          <main className="technical-container">
-            <section className="hero-block">
-              <div>
-                <span className="technical-eyebrow">
-                  ENGINEERING / TECHNICAL
-                </span>
-
-                <h1>
-                  Train for the
-                  companies you want.
-                </h1>
-
-                <p>
-                  Choose a company to
-                  explore its technical
-                  assessment levels.
-                  Every question is
-                  sourced from the
-                  technical training
-                  dataset.
-                </p>
-              </div>
-
-              <div className="hero-stat">
-                <strong>
-                  {COMPANIES.length}
-                </strong>
-
-                <span>
-                  COMPANIES
-                </span>
-              </div>
-            </section>
-
-            <section>
-              <div className="section-heading">
-                <div>
-                  <span>
-                    COMPANY TRAINING
-                  </span>
-
-                  <h2>
-                    Select a company
-                  </h2>
-                </div>
-
-                <span>
-                  TECHNICAL ROUND
-                </span>
-              </div>
-
-              <div className="company-grid">
-                {COMPANIES.map(
-                  (item) => (
-                    <CompanyCard
-                      key={
-                        item.id
-                      }
-                      company={
-                        item
-                      }
-                      onClick={() =>
-                        chooseCompany(
-                          item
-                        )
-                      }
-                    />
-                  )
-                )}
-              </div>
-            </section>
-          </main>
-        </div>
-      </>
-    );
-  }
-
-  /* =======================================================
-     LEVELS
-  ======================================================= */
-
-  if (
-    screen === "levels"
-  ) {
-    return (
-      <>
-        <style>
-          {TECHNICAL_CSS}
-        </style>
-
-        <div className="technical-page">
-          <TechnicalHeader
-            title={
-              company.name
-            }
-            subtitle="Technical assessment levels"
-            onBack={() => {
-              setScreen(
-                "companies"
-              );
-
-              setSelectedCompany(
-                null
-              );
-
-              navigate(
-                "/technical-lab"
-              );
-            }}
-          />
-
-          <main className="technical-container">
-            <section className="company-hero">
-              <CompanyLogo
-                company={
-                  company
-                }
-                large
-              />
-
-              <div className="company-hero-copy">
-                <span>
-                  {company.category}
-                </span>
-
-                <h1>
-                  {company.name}
-                </h1>
-
-                <p>
-                  Technical assessment
-                  progression
-                </p>
-              </div>
-
-              <div className="company-level-count">
-                <strong>
-                  {levels.length ||
-                    "—"}
-                </strong>
-
-                <span>
-                  LEVELS
-                </span>
-              </div>
-            </section>
-
-            {error && (
-              <ErrorBanner
-                message={
-                  error
-                }
-                onRetry={() =>
-                  loadLevels(
-                    company.id
-                  )
-                }
-              />
-            )}
-
-            {loadingLevels ? (
-              <LoadingBlock
-                text="Loading technical levels..."
-              />
-            ) : (
-              <section className="levels-section">
-                <div className="section-heading">
-                  <div>
-                    <span>
-                      {company.name.toUpperCase()}
-                    </span>
-
-                    <h2>
-                      Technical levels
-                    </h2>
-                  </div>
-
-                  <span>
-                    {levels.length}{" "}
-                    AVAILABLE
-                  </span>
-                </div>
-
-                <div className="level-list">
-                  {levels.map(
-                    (
-                      level,
-                      index
-                    ) => {
-                      const number =
-                        safeNumber(
-                          level?.level ??
-                            level?.levelNumber,
-                          index +
-                            1
-                        );
-
-                      const difficulty =
-                        firstValue(
-                          level?.difficulty,
-                          "Technical"
-                        );
-
-                      return (
-                        <button
-                          className="level-card"
-                          key={
-                            number
-                          }
-                          onClick={() =>
-                            startLevel(
-                              level
-                            )
-                          }
-                          disabled={
-                            loadingTest
-                          }
-                        >
-                          <div className="level-number">
-                            {String(
-                              number
-                            ).padStart(
-                              2,
-                              "0"
-                            )}
-                          </div>
-
-                          <div className="level-main">
-                            <span>
-                              {difficulty}
-                            </span>
-
-                            <h3>
-                              {firstValue(
-                                level?.title,
-                                `Technical Level ${number}`
-                              )}
-                            </h3>
-
-                            <p>
-                              {safeNumber(
-                                level?.questionCount,
-                                0
-                              )}{" "}
-                              questions
-                              {" · "}
-                              {safeNumber(
-                                level?.moduleCount,
-                                level
-                                  ?.modules
-                                  ?.length ||
-                                  0
-                              )}{" "}
-                              modules
-                            </p>
-                          </div>
-
-                          <div className="level-meta">
-                            <strong>
-                              {safeNumber(
-                                level?.questionCount,
-                                0
-                              )}
-                            </strong>
-
-                            <span>
-                              QUESTIONS
-                            </span>
-                          </div>
-
-                          <div className="level-arrow">
-                            →
-                          </div>
-                        </button>
-                      );
-                    }
-                  )}
-                </div>
-              </section>
-            )}
-          </main>
-
-          {loadingTest && (
-            <FullscreenLoader
-              text="Preparing technical assessment..."
-            />
-          )}
-        </div>
-      </>
-    );
-  }
-
-  /* =======================================================
-     RUNNING
-  ======================================================= */
-
-  if (
-    screen ===
-    "running"
-  ) {
-    return (
-      <>
-        <style>
-          {TECHNICAL_TEST_CSS}
-        </style>
-
-        <div className="technical-test">
-          <header className="testbar">
-            <div className="testbar-brand">
-              <CompanyLogo
-                company={
-                  company
-                }
-              />
-
-              <div>
-                <strong>
-                  {company.name}
-                </strong>
-
-                <span>
-                  Technical · Level{" "}
-                  {selectedLevel}
-                </span>
-              </div>
-            </div>
-
-            <div className="testbar-center">
-              <span>
-                QUESTION{" "}
-                {currentIndex +
-                  1}{" "}
-                /{" "}
-                {questions.length}
-              </span>
-
-              <div className="top-progress">
-                <i
-                  style={{
-                    width: `${progress}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            <div
-              className={
-                remainingSeconds <=
-                60
-                  ? "test-timer danger"
-                  : "test-timer"
-              }
-            >
-              <span>
-                TIME LEFT
-              </span>
-
-              <strong>
-                {formatTime(
-                  remainingSeconds
-                )}
-              </strong>
-            </div>
-          </header>
-
-          <div className="test-body">
-            <aside className="test-sidebar">
-              <div className="sidebar-top">
-                <span>
-                  QUESTIONS
-                </span>
-
-                <strong>
-                  {answeredCount}/
-                  {questions.length}
-                </strong>
-              </div>
-
-              <div className="question-palette">
-                {questions.map(
-                  (
-                    question,
-                    index
-                  ) => {
-                    const answered =
-                      answers[
-                        question.id
-                      ] !==
-                      undefined;
-
-                    return (
-                      <button
-                        key={
-                          question.id
-                        }
-                        className={[
-                          index ===
-                          currentIndex
-                            ? "active"
-                            : "",
-                          answered
-                            ? "answered"
-                            : "",
-                        ].join(
-                          " "
-                        )}
-                        onClick={() =>
-                          jumpQuestion(
-                            index
-                          )
-                        }
-                      >
-                        {String(
-                          index +
-                            1
-                        ).padStart(
-                          2,
-                          "0"
-                        )}
-                      </button>
-                    );
-                  }
-                )}
-              </div>
-
-              <div className="sidebar-bottom">
-                <span>
-                  PROGRESS
-                </span>
-
-                <strong>
-                  {progress}%
-                </strong>
-
-                <div>
-                  <i
-                    style={{
-                      width: `${progress}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </aside>
-
-            <main className="test-question-area">
-              <div className="question-meta">
-                <span>
-                  {currentQuestion?.module ||
-                    "TECHNICAL"}
-                </span>
-
-                <span>
-                  {currentQuestion?.difficulty ||
-                    "MIXED"}
-                </span>
-              </div>
-
-              <div className="question-container">
-                <div className="question-index">
-                  {String(
-                    currentIndex +
-                      1
-                  ).padStart(
-                    2,
-                    "0"
-                  )}
-                </div>
-
-                <h1>
-                  {
-                    currentQuestion?.question
-                  }
-                </h1>
-
-                {currentQuestion
-                  ?.images
-                  ?.length >
-                  0 && (
-                  <div className="question-images">
-                    {currentQuestion.images.map(
-                      (
-                        image,
-                        index
-                      ) => (
-                        <img
-                          key={
-                            index
-                          }
-                          src={
-                            image?.source ||
-                            image?.url ||
-                            image
-                          }
-                          alt={
-                            image?.alt ||
-                            "Question illustration"
-                          }
-                          onError={(
-                            event
-                          ) => {
-                            event.currentTarget.style.display =
-                              "none";
-                          }}
-                        />
-                      )
-                    )}
-                  </div>
-                )}
-
-                <div className="answer-options">
-                  {currentQuestion?.options?.map(
-                    (
-                      option,
-                      index
-                    ) => {
-                      const selected =
-                        currentAnswer ===
-                        index;
-
-                      return (
-                        <button
-                          key={
-                            `${currentQuestion.id}-${index}`
-                          }
-                          className={
-                            selected
-                              ? "selected"
-                              : ""
-                          }
-                          onClick={() =>
-                            chooseAnswer(
-                              currentQuestion.id,
-                              index
-                            )
-                          }
-                        >
-                          <span className="option-letter">
-                            {String.fromCharCode(
-                              65 +
-                                index
-                            )}
-                          </span>
-
-                          <span className="option-text">
-                            {
-                              option
-                            }
-                          </span>
-
-                          <span className="option-check">
-                            {selected
-                              ? "✓"
-                              : ""}
-                          </span>
-                        </button>
-                      );
-                    }
-                  )}
-                </div>
-              </div>
-
-              <div className="test-navigation">
-                <button
-                  className="nav-secondary"
-                  disabled={
-                    currentIndex ===
-                    0
-                  }
-                  onClick={
-                    previousQuestion
-                  }
-                >
-                  ← PREVIOUS
-                </button>
-
-                <div className="nav-status">
-                  {currentAnswer !==
-                  undefined
-                    ? "ANSWER SAVED"
-                    : "SELECT AN ANSWER"}
-                </div>
-
-                {currentIndex <
-                questions.length -
-                  1 ? (
-                  <button
-                    className="nav-primary"
-                    onClick={
-                      nextQuestion
-                    }
-                  >
-                    NEXT →
-                  </button>
-                ) : (
-                  <button
-                    className="nav-submit"
-                    onClick={() =>
-                      setShowSubmit(
-                        true
-                      )
-                    }
-                  >
-                    FINISH TEST
-                  </button>
-                )}
-              </div>
-            </main>
-          </div>
-
-          {showSubmit && (
-            <SubmitModal
-              answered={
-                answeredCount
-              }
-              unanswered={
-                unansweredCount
-              }
-              time={
-                remainingSeconds
-              }
-              submitting={
-                submitting
-              }
-              onCancel={() =>
-                setShowSubmit(
-                  false
-                )
-              }
-              onSubmit={() =>
-                submitAssessment(
-                  false
-                )
-              }
-            />
-          )}
-        </div>
-      </>
-    );
-  }
-
-  /* =======================================================
-     RESULT
-  ======================================================= */
-
-  return (
-    <>
-      <style>
-        {RESULT_CSS}
-      </style>
-
-      <div className="technical-result">
-        <div className="result-wrap">
-          <div className="result-company">
-            <CompanyLogo
-              company={
-                company
-              }
-              large
-            />
-
-            <div>
-              <span>
-                {company.name}
-              </span>
-
-              <strong>
-                Technical Assessment
-              </strong>
-            </div>
-          </div>
-
-          <div className="result-heading">
-            <span>
-              LEVEL{" "}
-              {selectedLevel}{" "}
-              COMPLETE
-            </span>
-
-            <h1>
-              Technical performance.
-            </h1>
-
-            <p>
-              Your latest attempt has
-              been evaluated and saved.
-            </p>
-          </div>
-
-          <div className="result-score-card">
-            <div className="score-ring">
-              <div>
-                <strong>
-                  {safeNumber(
-                    result?.percentage ??
-                      result?.score
-                  )}
-                </strong>
-
-                <span>
-                  /100
-                </span>
-              </div>
-            </div>
-
-            <div className="score-copy">
-              <span>
-                OVERALL SCORE
-              </span>
-
-              <h2>
-                {getVerdict(
-                  safeNumber(
-                    result?.percentage ??
-                      result?.score
-                  )
-                )}
-              </h2>
-
-              <p>
-                {safeNumber(
-                  result?.correctAnswers
-                )}{" "}
-                correct out of{" "}
-                {safeNumber(
-                  result?.totalQuestions
-                )}{" "}
-                questions.
-              </p>
-            </div>
-          </div>
-
-          <div className="result-metrics">
-            <ResultMetric
-              label="SCORE"
-              value={`${safeNumber(
-                result?.percentage ??
-                  result?.score
-              )}%`}
-            />
-
-            <ResultMetric
-              label="ACCURACY"
-              value={`${safeNumber(
-                result?.accuracy
-              )}%`}
-            />
-
-            <ResultMetric
-              label="CORRECT"
-              value={
-                result?.correctAnswers ??
-                0
-              }
-            />
-
-            <ResultMetric
-              label="ANSWERED"
-              value={
-                result?.answeredQuestions ??
-                0
-              }
-            />
-          </div>
-
-          <section className="module-analysis">
-            <div className="result-section-heading">
-              <div>
-                <span>
-                  TECHNICAL ANALYSIS
-                </span>
-
-                <h2>
-                  Module performance
-                </h2>
-              </div>
-            </div>
-
-            {Array.isArray(
-              result?.moduleBreakdown
-            ) &&
-            result.moduleBreakdown
-              .length > 0 ? (
-              <div className="module-list">
-                {result.moduleBreakdown.map(
-                  (
-                    item,
-                    index
-                  ) => {
-                    const score =
-                      safeNumber(
-                        item?.score
-                      );
-
-                    return (
-                      <div
-                        className="module-row"
-                        key={`${item?.moduleId}-${index}`}
-                      >
-                        <div>
-                          <strong>
-                            {firstValue(
-                              item?.module,
-                              item?.moduleId,
-                              "Technical"
-                            )}
-                          </strong>
-
-                          <span>
-                            {
-                              item?.correct
-                            }{" "}
-                            /{" "}
-                            {
-                              item?.total
-                            }{" "}
-                            correct
-                          </span>
-                        </div>
-
-                        <div className="module-progress">
-                          <i
-                            style={{
-                              width: `${score}%`,
-                            }}
-                          />
-                        </div>
-
-                        <strong>
-                          {score}%
-                        </strong>
-                      </div>
-                    );
-                  }
-                )}
-              </div>
-            ) : (
-              <div className="no-analysis">
-                Module analysis will
-                appear after the server
-                finishes processing the
-                result.
-              </div>
-            )}
-          </section>
-
-          <div className="result-note">
-            <span>
-              ✓
-            </span>
-
-            <p>
-              This is your latest technical
-              attempt for{" "}
-              <strong>
-                {company.name}
-              </strong>
-              . Retaking the same level
-              updates the latest result
-              while preserving your attempt
-              history.
-            </p>
-          </div>
-
-          <div className="result-actions">
-            <button
-              className="result-secondary"
-              onClick={
-                retake
-              }
-            >
-              RETAKE LEVEL
-            </button>
-
-            <button
-              className="result-primary"
-              onClick={() =>
-                navigate(
-                  "/dashboard"
-                )
-              }
-            >
-              VIEW DASHBOARD →
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* =========================================================
-   COMPANY CARD
-========================================================= */
-
-function CompanyCard({
-  company,
-  onClick,
-}) {
-  return (
-    <button
-      className="company-card"
-      onClick={onClick}
-    >
-      <CompanyLogo
-        company={company}
-      />
-
-      <div className="company-card-info">
-        <span>
-          {company.category}
-        </span>
-
-        <h3>
-          {company.name}
-        </h3>
-
-        <p>
-          Technical training
-        </p>
-      </div>
-
-      <span className="company-card-arrow">
-        →
-      </span>
-    </button>
-  );
-}
-
-/* =========================================================
-   COMPANY LOGO
-========================================================= */
-
-function CompanyLogo({
-  company,
-  large = false,
-}) {
-  const [
-    failed,
-    setFailed,
-  ] = useState(false);
-
-  return (
-    <div
-      className={
-        large
-          ? "company-logo large"
-          : "company-logo"
-      }
-    >
-      {!failed &&
-      company?.logo ? (
-        <img
-          src={
-            company.logo
+  useEffect(() => {
+    if (screen === "levels" && canonicalCompany) loadLevels(canonicalCompany);
+  }, [screen, canonicalCompany, loadLevels]);
+
+  const chooseCompany = useCallback(async c => {
+    await exitFullscreen();
+    setSelectedCompany(c);
+    setLevels([]);
+    setSelectedLevel(null);
+    setError("");
+    setScreen("levels");
+    navigate(`/technical-lab/${encodeURIComponent(c.id)}/levels`, {replace:true, state:{companyId:c.id}});
+  }, [navigate]);
+
+  const startLevel = useCallback(async level => {
+    if (!selectedCompany || loadingTest) return;
+    // Fullscreen must be requested from the user's click gesture.
+    requestFullscreen();
+    setLoadingTest(true); setError("");
+    try {
+      const levelNumber = safeNumber(level?.level ?? level?.levelNumber);
+      if (!levelNumber) throw new Error("Invalid technical level.");
+
+      const startResponse = await apiFetch("/api/technical/assessment/start", {
+        method:"POST",
+        body:JSON.stringify({companyId:selectedCompany.id, levelNumber})
+      });
+      const startPayload = await startResponse.json().catch(() => ({}));
+      if (!startResponse.ok) throw new Error(startPayload?.error || startPayload?.message || "Unable to start technical attempt.");
+      const attempt = startPayload?.data ?? startPayload;
+      const id = firstValue(attempt?.attemptId, startPayload?.attemptId);
+      if (!id) throw new Error("Server did not return an attempt ID.");
+
+      const questionResponse = await apiFetch(
+        `/api/technical/company/${encodeURIComponent(selectedCompany.id)}/levels/${levelNumber}`
+      );
+      const questionPayload = await questionResponse.json().catch(() => ({}));
+      if (!questionResponse.ok) throw new Error(questionPayload?.error || questionPayload?.message || "Unable to load technical questions.");
+
+      const normalized = normalizeQuestions(questionPayload);
+      if (!normalized.length) throw new Error("This technical level has no usable questions.");
+
+      const levelData = questionPayload?.data ?? questionPayload;
+      const durationMinutes = Math.max(1, safeNumber(
+        firstValue(levelData?.estimatedMinutes, level?.estimatedMinutes, attempt?.estimatedMinutes, 60), 60
+      ));
+      const seconds = Math.max(60, Math.round(durationMinutes * 60));
+      const now = new Date().toISOString();
+
+      const session = {
+        attemptId:id, companyId:selectedCompany.id, levelNumber, startedAt:now,
+        timeAllowed:seconds, questions:normalized, answers:{}, currentIndex:0, violations:[]
+      };
+      storeAttempt(session);
+
+      setAttemptId(id); setSelectedLevel(levelNumber); setQuestions(normalized);
+      setAnswers({}); answersRef.current = {};
+      setCurrentIndex(0); setResult(null); setShowSubmit(false);
+      setTimeAllowed(seconds); setRemainingSeconds(seconds); remainingRef.current = seconds;
+      setStartedAt(now); startedAtRef.current = now;
+      setViolations([]); setProctorWarning(""); setProctorLocked(false);
+      setScreen("running");
+      navigate(`/technical-lab/${encodeURIComponent(selectedCompany.id)}/level/${levelNumber}/attempt/${encodeURIComponent(id)}`, {replace:true});
+    } catch (e) {
+      console.error("[TECHNICAL START]", e);
+      await exitFullscreen();
+      setError(e.message || "Unable to start technical assessment.");
+    } finally { setLoadingTest(false); }
+  }, [loadingTest, navigate, selectedCompany]);
+
+  // Restore an interrupted browser refresh without trusting client-side score data.
+  useEffect(() => {
+    if (screen !== "running" || !attemptId || questions.length) return;
+    const saved = readStoredAttempt();
+    if (!saved || String(saved.attemptId) !== String(attemptId)) {
+      goLevels(canonicalCompany);
+      return;
+    }
+    const elapsed = Math.floor((Date.now() - new Date(saved.startedAt).getTime()) / 1000);
+    const remaining = Math.max(0, safeNumber(saved.timeAllowed) - elapsed);
+    setAttemptId(saved.attemptId); setSelectedCompany(getCompany(saved.companyId));
+    setSelectedLevel(safeNumber(saved.levelNumber)); setQuestions(saved.questions || []);
+    setAnswers(saved.answers || {}); answersRef.current = saved.answers || {};
+    setCurrentIndex(Math.min(saved.currentIndex || 0, Math.max(0,(saved.questions || []).length-1)));
+    setStartedAt(saved.startedAt); startedAtRef.current = saved.startedAt;
+    setTimeAllowed(safeNumber(saved.timeAllowed)); setRemainingSeconds(remaining); remainingRef.current = remaining;
+    setViolations(saved.violations || []);
+    if (remaining <= 0) setTimeout(() => submitRef.current?.(true), 0);
+  }, [screen, attemptId, questions.length, canonicalCompany, goLevels]);
+
+  // Persist only session continuity data. Server remains authoritative for scoring.
+  useEffect(() => {
+    if (screen !== "running" || !attemptId || !questions.length) return;
+    storeAttempt({
+      attemptId, companyId:company.id, levelNumber:selectedLevel, startedAt,
+      timeAllowed, questions, answers, currentIndex, violations
+    });
+  }, [screen, attemptId, company.id, selectedLevel, startedAt, timeAllowed, questions, answers, currentIndex, violations]);
+
+  const addViolation = useCallback((type, detail = "") => {
+    if (screen !== "running" || submittingRef.current || violationLockRef.current) return;
+    violationLockRef.current = true;
+    const item = {type, detail, at:new Date().toISOString()};
+    setViolations(prev => [...prev, item]);
+    setProctorWarning(detail || "Proctoring rule triggered.");
+    window.setTimeout(() => { violationLockRef.current = false; }, 700);
+  }, [screen]);
+
+  // Browser-side proctoring. This is a deterrent/audit layer; it is not equivalent to a webcam/OS-level proctor.
+  useEffect(() => {
+    if (screen !== "running") return;
+    const onVisibility = () => {
+      if (document.hidden) addViolation("TAB_SWITCH", "Tab/window change detected. Return to the assessment.");
+    };
+    const onFullscreen = () => {
+      if (!document.fullscreenElement) addViolation("FULLSCREEN_EXIT", "Fullscreen mode was exited.");
+    };
+    const onBlur = () => addViolation("WINDOW_BLUR", "Assessment window lost focus.");
+    const onContext = e => { e.preventDefault(); addViolation("CONTEXT_MENU", "Right-click is disabled during the assessment."); };
+    const onCopy = e => { e.preventDefault(); addViolation("COPY", "Copy is disabled during the assessment."); };
+    const onCut = e => { e.preventDefault(); addViolation("CUT", "Cut is disabled during the assessment."); };
+    const onPaste = e => { e.preventDefault(); addViolation("PASTE", "Paste is disabled during the assessment."); };
+    const onKey = e => {
+      const blocked = e.key === "F12" || (e.ctrlKey && e.shiftKey && ["I","J","C"].includes(e.key.toUpperCase())) ||
+        (e.ctrlKey && ["U","S","P"].includes(e.key.toUpperCase())) || (e.metaKey && ["U","S","P"].includes(e.key.toUpperCase()));
+      if (blocked) { e.preventDefault(); addViolation("SHORTCUT", "Restricted browser shortcut detected."); }
+    };
+    const onBeforeUnload = e => {
+      e.preventDefault(); e.returnValue = "";
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener("fullscreenchange", onFullscreen);
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("contextmenu", onContext);
+    document.addEventListener("copy", onCopy);
+    document.addEventListener("cut", onCut);
+    document.addEventListener("paste", onPaste);
+    document.addEventListener("keydown", onKey, true);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("fullscreenchange", onFullscreen);
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("contextmenu", onContext);
+      document.removeEventListener("copy", onCopy);
+      document.removeEventListener("cut", onCut);
+      document.removeEventListener("paste", onPaste);
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [screen, addViolation]);
+
+  // Policy: after too many client-side violations, lock and submit.
+  useEffect(() => {
+    if (violations.length >= PROCTOR_LIMIT && screen === "running") {
+      setProctorLocked(true);
+      setProctorWarning("Maximum proctoring violations reached. Your attempt will be submitted.");
+      const t = setTimeout(() => submitRef.current?.(true, "PROCTORING_VIOLATION_LIMIT"), 900);
+      return () => clearTimeout(t);
+    }
+  }, [violations.length, screen]);
+
+  const submitAssessment = useCallback(async (automatic = false, autoReason = "") => {
+    if (!attemptId || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    clearInterval(timerRef.current);
+    try {
+      const response = await apiFetch("/api/technical/assessment/submit", {
+        method:"POST",
+        body:JSON.stringify({
+          attemptId,
+          companyId:company.id,
+          levelNumber:selectedLevel,
+          answers:answersRef.current,
+          startedAt:startedAtRef.current,
+          completedAt:new Date().toISOString(),
+          timeAllowedSeconds:timeAllowed,
+          timeUsedSeconds:Math.max(0, timeAllowed - remainingRef.current),
+          automaticSubmission:automatic,
+          autoSubmissionReason:autoReason || (automatic ? "TIME_EXPIRED" : ""),
+          proctoring:{
+            mode:"browser_fullscreen",
+            violationCount:violations.length,
+            violations,
+            locked:proctorLocked || violations.length >= PROCTOR_LIMIT
           }
-          alt={
-            company.name
-          }
-          onError={() =>
-            setFailed(
-              true
-            )
-          }
-        />
-      ) : (
-        <span>
-          {String(
-            company?.name ||
-              "E"
-          )
-            .trim()
-            .charAt(0)
-            .toUpperCase()}
-        </span>
-      )}
-    </div>
-  );
-}
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || payload?.message || `Technical submission failed (${response.status}).`);
+      setResult(payload?.data ?? payload);
+      clearStoredAttempt();
+      setScreen("result");
+      navigate(`/technical-lab/${encodeURIComponent(company.id)}/level/${selectedLevel}/result`, {replace:true});
+      await exitFullscreen();
+    } catch (e) {
+      console.error("[TECHNICAL SUBMIT]", e);
+      setError(e.message || "Unable to submit technical assessment.");
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  }, [attemptId, company.id, selectedLevel, timeAllowed, violations, proctorLocked, navigate]);
 
-/* =========================================================
-   HEADER
-========================================================= */
+  useEffect(() => { submitRef.current = submitAssessment; }, [submitAssessment]);
 
-function TechnicalHeader({
-  title,
-  subtitle,
-  onBack,
-}) {
-  return (
-    <header className="technical-header">
-      <button
-        className="header-back"
-        onClick={onBack}
-      >
-        ←
-      </button>
+  useEffect(() => {
+    if (screen !== "running") { clearInterval(timerRef.current); return; }
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setRemainingSeconds(prev => {
+        const next = Math.max(0, prev - 1);
+        remainingRef.current = next;
+        if (next === 0) {
+          clearInterval(timerRef.current);
+          setTimeout(() => submitRef.current?.(true, "TIME_EXPIRED"), 0);
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [screen]);
 
-      <div className="header-brand">
-        <div className="engviva-mark">
-          E
-        </div>
+  useEffect(() => () => {
+    clearInterval(timerRef.current);
+    document.body.style.overflow = "";
+  }, []);
 
-        <div>
-          <strong>
-            ENGVIVA
-          </strong>
+  const chooseAnswer = useCallback((questionId, optionIndex) => {
+    if (screen !== "running" || proctorLocked) return;
+    setAnswers(prev => {
+      const next = {...prev, [questionId]:optionIndex};
+      answersRef.current = next;
+      return next;
+    });
+  }, [screen, proctorLocked]);
 
-          <span>
-            TECHNICAL LAB
-          </span>
-        </div>
-      </div>
+  const nextQuestion = useCallback(() => setCurrentIndex(i => Math.min(questions.length-1, i+1)), [questions.length]);
+  const previousQuestion = useCallback(() => setCurrentIndex(i => Math.max(0, i-1)), []);
+  const jumpQuestion = useCallback(i => setCurrentIndex(i), []);
 
-      <div className="header-title">
-        <strong>
-          {title}
-        </strong>
+  const retake = useCallback(() => {
+    const level = levels.find(l => safeNumber(l?.level ?? l?.levelNumber) === Number(selectedLevel));
+    if (level) startLevel(level);
+    else goLevels(company.id);
+  }, [levels, selectedLevel, startLevel, goLevels, company.id]);
 
-        <span>
-          {subtitle}
-        </span>
-      </div>
-    </header>
-  );
-}
+  const answeredCount = questions.filter(q => answers[q.id] !== undefined).length;
+  const unansweredCount = Math.max(0, questions.length - answeredCount);
+  const progress = questions.length ? Math.round(answeredCount / questions.length * 100) : 0;
+  const currentQuestion = questions[currentIndex];
+  const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
 
-/* =========================================================
-   LOADING
-========================================================= */
+  // Result route can only be shown after an in-memory result exists. This avoids fake/duplicate result screens.
+  useEffect(() => {
+    if (routeAttemptId && screen === "running" && !attemptId) goLevels(canonicalCompany);
+  }, [routeAttemptId, screen, attemptId, canonicalCompany, goLevels]);
 
-function LoadingBlock({
-  text,
-}) {
-  return (
-    <div className="loading-block">
-      <div className="spinner" />
-
-      <span>
-        {text}
-      </span>
-    </div>
-  );
-}
-
-function FullscreenLoader({
-  text,
-}) {
-  return (
-    <div className="fullscreen-loader">
-      <div>
-        <div className="spinner" />
-
-        <strong>
-          {text}
-        </strong>
-
-        <span>
-          Loading questions securely...
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   ERROR
-========================================================= */
-
-function ErrorBanner({
-  message,
-  onRetry,
-}) {
-  return (
-    <div className="error-banner">
-      <div>
-        <strong>
-          Something went wrong
-        </strong>
-
-        <span>
-          {message}
-        </span>
-      </div>
-
-      <button
-        onClick={onRetry}
-      >
-        RETRY
-      </button>
-    </div>
-  );
-}
-
-/* =========================================================
-   SUBMIT MODAL
-========================================================= */
-
-function SubmitModal({
-  answered,
-  unanswered,
-  time,
-  submitting,
-  onCancel,
-  onSubmit,
-}) {
-  return (
-    <div className="modal-backdrop">
-      <div className="submit-modal">
-        <div className="modal-symbol">
-          ✓
-        </div>
-
-        <span>
-          FINAL SUBMISSION
-        </span>
-
-        <h2>
-          Finish technical test?
-        </h2>
-
-        <p>
-          Your answers will be sent to
-          the server for secure
-          evaluation.
-        </p>
-
-        <div className="modal-stats">
-          <div>
-            <strong>
-              {answered}
-            </strong>
-
-            <span>
-              ANSWERED
-            </span>
+  if (screen === "companies") return <>
+    <style>{TECHNICAL_CSS}</style>
+    <div className="technical-page">
+      <TechnicalHeader title="Technical Lab" subtitle="Company-specific engineering assessments" onBack={() => navigate("/dashboard")} />
+      <main className="technical-container">
+        <section className="hero-block">
+          <div><span className="technical-eyebrow">ENGINEERING / TECHNICAL</span>
+            <h1>Train for the companies you want.</h1>
+            <p>Choose a company to explore its technical assessment levels. Every assessment is evaluated by the server.</p>
           </div>
+          <div className="hero-stat"><strong>{COMPANIES.length}</strong><span>COMPANIES</span></div>
+        </section>
+        <section>
+          <div className="section-heading"><div><span>COMPANY TRAINING</span><h2>Select a company</h2></div><span>TECHNICAL ROUND</span></div>
+          <div className="company-grid">{COMPANIES.map(c => <CompanyCard key={c.id} company={c} onClick={() => chooseCompany(c)} />)}</div>
+        </section>
+      </main>
+    </div>
+  </>;
 
-          <div>
-            <strong>
-              {unanswered}
-            </strong>
+  if (screen === "levels") return <>
+    <style>{TECHNICAL_CSS}</style>
+    <div className="technical-page">
+      <TechnicalHeader title={company.name} subtitle="Technical assessment levels" onBack={goCompanies} />
+      <main className="technical-container">
+        <section className="company-hero">
+          <CompanyLogo company={company} large />
+          <div className="company-hero-copy"><span>{company.category}</span><h1>{company.name}</h1><p>Technical assessment progression</p></div>
+          <div className="company-level-count"><strong>{levels.length || "—"}</strong><span>LEVELS</span></div>
+        </section>
+        {error && <ErrorBanner message={error} onRetry={() => loadLevels(company.id)} />}
+        {loadingLevels ? <LoadingBlock text="Loading technical levels..." /> :
+          <section className="levels-section">
+            <div className="section-heading"><div><span>{company.name.toUpperCase()}</span><h2>Technical levels</h2></div><span>{levels.length} AVAILABLE</span></div>
+            <div className="level-list">{levels.map((level,index) => {
+              const number = safeNumber(level?.level ?? level?.levelNumber,index+1);
+              return <button className="level-card" key={`${company.id}-${number}`} onClick={() => startLevel(level)} disabled={loadingTest}>
+                <div className="level-number">{String(number).padStart(2,"0")}</div>
+                <div className="level-main"><span>{firstValue(level?.difficulty,"Technical")}</span><h3>{firstValue(level?.title,`Technical Level ${number}`)}</h3><p>{safeNumber(level?.questionCount,0)} questions · {safeNumber(level?.moduleCount,level?.modules?.length || 0)} modules</p></div>
+                <div className="level-meta"><strong>{safeNumber(level?.questionCount,0)}</strong><span>QUESTIONS</span></div><div className="level-arrow">→</div>
+              </button>;
+            })}</div>
+          </section>}
+      </main>
+      {loadingTest && <FullscreenLoader text="Preparing technical assessment..." />}
+    </div>
+  </>;
 
-            <span>
-              UNANSWERED
-            </span>
+  if (screen === "running") return <>
+    <style>{TECHNICAL_TEST_CSS}</style>
+    <div className="technical-test proctor-shell">
+      <header className="testbar">
+        <div className="testbar-brand"><CompanyLogo company={company}/><div><strong>{company.name}</strong><span>Technical · Level {selectedLevel}</span></div><span className="proctor-badge"><i className="proctor-dot"/> PROCTORED</span></div>
+        <div className="testbar-center"><span>QUESTION {currentIndex+1} / {questions.length}</span><div className="top-progress"><i style={{width:`${progress}%`}}/></div></div>
+        <div className={remainingSeconds <= 60 ? "test-timer danger":"test-timer"}><span>TIME LEFT</span><strong>{formatTime(remainingSeconds)}</strong><small className="proctor-count">{violations.length}/{PROCTOR_LIMIT} FLAGS</small></div>
+      </header>
+      <div className="test-body">
+        <aside className="test-sidebar"><div className="sidebar-top"><span>QUESTIONS</span><strong>{answeredCount}/{questions.length}</strong></div>
+          <div className="question-palette">{questions.map((q,index) => <button key={q.id} className={[index===currentIndex?"active":"",answers[q.id]!==undefined?"answered":""].join(" ")} onClick={() => jumpQuestion(index)}>{String(index+1).padStart(2,"0")}</button>)}</div>
+          <div className="sidebar-bottom"><span>PROGRESS</span><strong>{progress}%</strong><div><i style={{width:`${progress}%`}}/></div></div>
+        </aside>
+        <main className="test-question-area">
+          <div className="question-meta"><span>{currentQuestion?.module || "TECHNICAL"}</span><span>{currentQuestion?.difficulty || "MIXED"}</span></div>
+          <div className="question-container">
+            <div className="question-index">{String(currentIndex+1).padStart(2,"0")}</div>
+            <h1>{currentQuestion?.question}</h1>
+            {currentQuestion?.images?.length > 0 && <div className="question-images">{currentQuestion.images.map((image,i) => <img key={i} src={image?.source || image?.url || image} alt={image?.alt || "Question illustration"} onError={e => {e.currentTarget.style.display="none";}}/>)}</div>}
+            <div className="answer-options">{currentQuestion?.options?.map((option,index) => {
+              const selected = currentAnswer === index;
+              return <button key={`${currentQuestion.id}-${index}`} className={selected?"selected":""} disabled={proctorLocked} onClick={() => chooseAnswer(currentQuestion.id,index)}>
+                <span className="option-letter">{String.fromCharCode(65+index)}</span><span className="option-text">{option}</span><span className="option-check">{selected?"✓":""}</span>
+              </button>;
+            })}</div>
           </div>
-
-          <div>
-            <strong>
-              {formatTime(
-                time
-              )}
-            </strong>
-
-            <span>
-              TIME LEFT
-            </span>
+          <div className="test-navigation">
+            <button className="nav-secondary" disabled={currentIndex===0 || proctorLocked} onClick={previousQuestion}>← PREVIOUS</button>
+            <div className="nav-status">{currentAnswer !== undefined ? "ANSWER SAVED":"SELECT AN ANSWER"}</div>
+            {currentIndex < questions.length-1 ?
+              <button className="nav-primary" disabled={proctorLocked} onClick={nextQuestion}>NEXT →</button> :
+              <button className="nav-submit" disabled={proctorLocked} onClick={() => setShowSubmit(true)}>FINISH TEST</button>}
           </div>
-        </div>
-
-        <div className="modal-actions">
-          <button
-            className="modal-cancel"
-            disabled={
-              submitting
-            }
-            onClick={
-              onCancel
-            }
-          >
-            CONTINUE TEST
-          </button>
-
-          <button
-            className="modal-confirm"
-            disabled={
-              submitting
-            }
-            onClick={
-              onSubmit
-            }
-          >
-            {submitting
-              ? "SUBMITTING..."
-              : "SUBMIT TEST →"}
-          </button>
-        </div>
+        </main>
       </div>
+      {proctorWarning && !proctorLocked && <div className="proctor-warning"><strong>PROCTORING FLAG</strong><span>{proctorWarning}</span></div>}
+      {proctorLocked && <div className="modal-backdrop"><div className="submit-modal"><div className="modal-symbol">!</div><span>PROCTORING LOCK</span><h2>Assessment locked.</h2><p>The browser detected repeated restricted activity. Your attempt is being submitted with the proctoring audit attached.</p></div></div>}
+      {showSubmit && <SubmitModal answered={answeredCount} unanswered={unansweredCount} time={remainingSeconds} submitting={submitting} onCancel={() => setShowSubmit(false)} onSubmit={() => {setShowSubmit(false); submitAssessment(false,"USER_SUBMITTED");}}/>}
     </div>
-  );
+  </>;
+
+  return <>
+    <style>{RESULT_CSS}</style>
+    <div className="technical-result"><div className="result-wrap">
+      <div className="result-company"><CompanyLogo company={company} large/><div><span>{company.name}</span><strong>Technical Assessment</strong></div></div>
+      <div className="result-heading"><span>LEVEL {selectedLevel} COMPLETE</span><h1>Technical performance.</h1><p>Your latest attempt has been evaluated and saved.</p></div>
+      <div className="result-score-card"><div className="score-ring"><div><strong>{safeNumber(result?.percentage ?? result?.score)}</strong><span>/100</span></div></div>
+        <div className="score-copy"><span>OVERALL SCORE</span><h2>{getVerdict(safeNumber(result?.percentage ?? result?.score))}</h2><p>{safeNumber(result?.correctAnswers)} correct out of {safeNumber(result?.totalQuestions)} questions.</p></div>
+      </div>
+      <div className="result-metrics">
+        <ResultMetric label="SCORE" value={`${safeNumber(result?.percentage ?? result?.score)}%`}/>
+        <ResultMetric label="ACCURACY" value={`${safeNumber(result?.accuracy)}%`}/>
+        <ResultMetric label="CORRECT" value={result?.correctAnswers ?? 0}/>
+        <ResultMetric label="ANSWERED" value={result?.answeredQuestions ?? 0}/>
+      </div>
+      <section className="module-analysis"><div className="result-section-heading"><div><span>TECHNICAL ANALYSIS</span><h2>Module performance</h2></div></div>
+        {Array.isArray(result?.moduleBreakdown) && result.moduleBreakdown.length ? <div className="module-list">{result.moduleBreakdown.map((item,index) => {
+          const score=safeNumber(item?.score);
+          return <div className="module-row" key={`${item?.moduleId}-${index}`}><div><strong>{firstValue(item?.module,item?.moduleId,"Technical")}</strong><span>{item?.correct} / {item?.total} correct</span></div><div className="module-progress"><i style={{width:`${score}%`}}/></div><strong>{score}%</strong></div>;
+        })}</div> : <div className="no-analysis">Module analysis will appear after the server finishes processing the result.</div>}
+      </section>
+      {violations.length > 0 && <div className="result-note"><span>!</span><p><strong>Proctoring:</strong> {violations.length} browser flag(s) were recorded for this attempt.</p></div>}
+      {error && <ErrorBanner message={error} onRetry={() => setError("")}/>}
+      <div className="result-actions"><button className="result-secondary" onClick={retake}>RETAKE LEVEL</button><button className="result-primary" onClick={() => navigate("/dashboard")}>VIEW DASHBOARD →</button></div>
+    </div></div>
+  </>;
 }
 
-/* =========================================================
-   RESULT HELPERS
-========================================================= */
-
-function ResultMetric({
-  label,
-  value,
-}) {
-  return (
-    <div className="result-metric">
-      <span>
-        {label}
-      </span>
-
-      <strong>
-        {value}
-      </strong>
-    </div>
-  );
+function CompanyCard({company,onClick}) {
+  return <button className="company-card" onClick={onClick}><CompanyLogo company={company}/><div className="company-card-info"><span>{company.category}</span><h3>{company.name}</h3><p>Technical training</p></div><span className="company-card-arrow">→</span></button>;
 }
-
-function getVerdict(
-  score
-) {
-  if (score >= 90)
-    return "Exceptional technical performance";
-
-  if (score >= 80)
-    return "Excellent technical performance";
-
-  if (score >= 70)
-    return "Strong technical performance";
-
-  if (score >= 50)
-    return "Developing technical performance";
-
+function CompanyLogo({company,large=false}) {
+  const [failed,setFailed]=useState(false);
+  return <div className={large?"company-logo large":"company-logo"}>{!failed&&company?.logo?<img src={company.logo} alt={company.name} onError={()=>setFailed(true)}/>:<span>{String(company?.name||"E").trim().charAt(0).toUpperCase()}</span>}</div>;
+}
+function TechnicalHeader({title,subtitle,onBack}) {
+  return <header className="technical-header"><button className="header-back" onClick={onBack}>←</button><div className="header-brand"><div className="engviva-mark">E</div><div><strong>ENGVIVA</strong><span>TECHNICAL LAB</span></div></div><div className="header-title"><strong>{title}</strong><span>{subtitle}</span></div></header>;
+}
+function LoadingBlock({text}) { return <div className="loading-block"><div className="spinner"/><span>{text}</span></div>; }
+function FullscreenLoader({text}) { return <div className="fullscreen-loader"><div><div className="spinner"/><strong>{text}</strong><span>Loading questions securely...</span></div></div>; }
+function ErrorBanner({message,onRetry}) { return <div className="error-banner"><div><strong>Something went wrong</strong><span>{message}</span></div><button onClick={onRetry}>RETRY</button></div>; }
+function SubmitModal({answered,unanswered,time,submitting,onCancel,onSubmit}) {
+  return <div className="modal-backdrop"><div className="submit-modal"><div className="modal-symbol">✓</div><span>FINAL SUBMISSION</span><h2>Finish technical test?</h2><p>Your answers will be sent to the server for secure evaluation.</p><div className="modal-stats"><div><strong>{answered}</strong><span>ANSWERED</span></div><div><strong>{unanswered}</strong><span>UNANSWERED</span></div><div><strong>{formatTime(time)}</strong><span>TIME LEFT</span></div></div><div className="modal-actions"><button className="modal-cancel" disabled={submitting} onClick={onCancel}>CONTINUE TEST</button><button className="modal-confirm" disabled={submitting} onClick={onSubmit}>{submitting?"SUBMITTING...":"SUBMIT TEST →"}</button></div></div></div>;
+}
+function ResultMetric({label,value}) { return <div className="result-metric"><span>{label}</span><strong>{value}</strong></div>; }
+function getVerdict(score) {
+  if(score>=90) return "Exceptional technical performance";
+  if(score>=80) return "Excellent technical performance";
+  if(score>=70) return "Strong technical performance";
+  if(score>=50) return "Developing technical performance";
   return "Keep building your technical depth";
 }
-
-/* =========================================================
-   GENERAL CSS
-========================================================= */
 
 const TECHNICAL_CSS = `
 * {
@@ -3501,11 +1378,6 @@ button {
   }
 }
 `;
-
-/* =========================================================
-   TEST CSS
-========================================================= */
-
 const TECHNICAL_TEST_CSS = `
 * {
   box-sizing: border-box;
@@ -4067,12 +1939,65 @@ const TECHNICAL_TEST_CSS = `
     grid-row: 1;
   }
 }
+
+.proctor-shell {
+  position: relative;
+}
+.proctor-warning {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 80;
+  max-width: 360px;
+  padding: 13px 15px;
+  border: 1px solid rgba(255,90,110,.22);
+  border-radius: 13px;
+  background: rgba(35,10,15,.94);
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+.proctor-warning strong,
+.proctor-warning span {
+  display: block;
+}
+.proctor-warning strong {
+  color: #ff9aa7;
+  font-size: 10px;
+  letter-spacing: .8px;
+}
+.proctor-warning span {
+  margin-top: 4px;
+  color: #a78d94;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.proctor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  color: #9fe8b6;
+  background: rgba(100,220,140,.055);
+  border: 1px solid rgba(100,220,140,.12);
+  font-size: 7px;
+  font-weight: 950;
+  letter-spacing: .8px;
+}
+.proctor-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #7ee59b;
+  box-shadow: 0 0 10px rgba(126,229,155,.7);
+}
+.proctor-count {
+  color: #ff9aa7;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: .7px;
+}
 `;
-
-/* =========================================================
-   RESULT CSS
-========================================================= */
-
 const RESULT_CSS = `
 * {
   box-sizing: border-box;
