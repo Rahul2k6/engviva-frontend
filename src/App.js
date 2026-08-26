@@ -1,9 +1,9 @@
 ﻿import React from "react";
 import {
   BrowserRouter,
-  Routes,
-  Route,
   Navigate,
+  Route,
+  Routes,
 } from "react-router-dom";
 
 import SplashScreen from "./screens/SplashScreen";
@@ -22,7 +22,6 @@ import Assessments from "./screens/Assessments";
 import AssessmentTest from "./screens/AssessmentTest";
 
 import TechnicalAssessment from "./screens/TechnicalAssessment";
-
 import CodingLab from "./screens/CodingLab";
 
 import Interviews from "./screens/Interviews";
@@ -43,10 +42,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
 
-        {/* =====================================================
-            ENTRY
-        ===================================================== */}
-
+        {/* ENTRY */}
         <Route
           path="/"
           element={<SplashScreen />}
@@ -57,19 +53,13 @@ export default function App() {
           element={<LoginScreen />}
         />
 
-        {/* =====================================================
-            DASHBOARD
-        ===================================================== */}
-
+        {/* DASHBOARD */}
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
-        {/* =====================================================
-            PROFILE
-        ===================================================== */}
-
+        {/* PROFILE */}
         <Route
           path="/profile-setup"
           element={<ProfileSetup />}
@@ -80,10 +70,7 @@ export default function App() {
           element={<Profile />}
         />
 
-        {/* =====================================================
-            COMPANIES
-        ===================================================== */}
-
+        {/* COMPANIES */}
         <Route
           path="/companies"
           element={<Companies />}
@@ -94,19 +81,13 @@ export default function App() {
           element={<CompanyDetails />}
         />
 
-        {/* =====================================================
-            ROLE PREPARATION
-        ===================================================== */}
-
+        {/* ROLE PREPARATION */}
         <Route
           path="/role-preparation"
           element={<RolePreparation />}
         />
 
-        {/* =====================================================
-            PRACTICE
-        ===================================================== */}
-
+        {/* PRACTICE */}
         <Route
           path="/practice"
           element={<Practice />}
@@ -123,64 +104,40 @@ export default function App() {
         />
 
         {/* =====================================================
-            CODING LAB
-        ===================================================== */}
-
-        <Route
-          path="/practice/coding"
-          element={<CodingLab />}
-        />
-
-        {/* =====================================================
             TECHNICAL LAB
         ===================================================== */}
 
         {/* Company selection */}
-
         <Route
           path="/technical-lab"
           element={<TechnicalAssessment />}
         />
 
-        {/* Company levels */}
-
+        {/* Technical levels */}
         <Route
           path="/technical-lab/:companyId/levels"
           element={<TechnicalAssessment />}
         />
 
-        {/* Active proctored attempt */}
-
+        {/* Active technical test */}
         <Route
-          path="/technical-lab/:companyId/level/:levelNumber/attempt/:attemptId"
+          path="/technical-lab/:companyId/level/:levelNumber"
           element={<TechnicalAssessment />}
         />
 
-        {/* Result */}
-
+        {/* Technical result */}
         <Route
           path="/technical-lab/:companyId/level/:levelNumber/result"
           element={<TechnicalAssessment />}
         />
 
-        {/* =====================================================
-            LEGACY TECHNICAL LAB URLS
-        ===================================================== */}
-
+        {/* CODING */}
         <Route
-          path="/technical-lab/:companyId"
-          element={
-            <Navigate
-              to="/technical-lab"
-              replace
-            />
-          }
+          path="/practice/coding"
+          element={<CodingLab />}
         />
 
-        {/* =====================================================
-            INTERVIEWS
-        ===================================================== */}
-
+        {/* INTERVIEWS */}
         <Route
           path="/interviews"
           element={<Interviews />}
@@ -201,19 +158,13 @@ export default function App() {
           element={<Interview />}
         />
 
-        {/* =====================================================
-            RESUME
-        ===================================================== */}
-
+        {/* RESUME */}
         <Route
           path="/resume"
           element={<Resume />}
         />
 
-        {/* =====================================================
-            REPORTS
-        ===================================================== */}
-
+        {/* REPORTS */}
         <Route
           path="/reports"
           element={<Reports />}
@@ -224,28 +175,19 @@ export default function App() {
           element={<ReportDetails />}
         />
 
-        {/* =====================================================
-            PROGRESS
-        ===================================================== */}
-
+        {/* PROGRESS */}
         <Route
           path="/progress"
           element={<Progress />}
         />
 
-        {/* =====================================================
-            NOTIFICATIONS
-        ===================================================== */}
-
+        {/* NOTIFICATIONS */}
         <Route
           path="/notifications"
           element={<Notifications />}
         />
 
-        {/* =====================================================
-            GLOBAL FALLBACK
-        ===================================================== */}
-
+        {/* FALLBACK */}
         <Route
           path="*"
           element={
