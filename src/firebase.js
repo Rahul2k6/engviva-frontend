@@ -1,54 +1,24 @@
 import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  GoogleAuthProvider,
-} from "firebase/auth";
-import {
-  getFirestore,
-} from "firebase/firestore";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
-// =========================================================
-// FIREBASE CONFIG
-// =========================================================
-
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBuV9BoNnoePUWN2yeR7zbeawY3jCR3bY8",
+  apiKey: "AIzaSyBu2wV9BoNnoePUWN2yeR7zawY3jCR3bY8",
   authDomain: "interviq-9cb86.firebaseapp.com",
   projectId: "interviq-9cb86",
   storageBucket: "interviq-9cb86.firebasestorage.app",
   messagingSenderId: "744584865119",
   appId: "1:744584865119:web:fc010af45f67be2ac002ea",
-  measurementId: "G-PSZSWSK6NF",
+  measurementId: "G-PSZSWSK6NF"
 };
 
-// =========================================================
-// INITIALIZE FIREBASE
-// =========================================================
-
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// =========================================================
-// AUTHENTICATION
-// =========================================================
-
+// Initialize Firebase Authentication and get a reference to the service
 const auth = getAuth(app);
 
-// Google provider
+// Initialize the Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
 
-// =========================================================
-// FIRESTORE
-// =========================================================
-
-const db = getFirestore(app);
-
-// =========================================================
-// EXPORTS
-// =========================================================
-
-export {
-  app,
-  auth,
-  db,
-  googleProvider,
-};
+export { auth, db,googleProvider };
