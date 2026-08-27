@@ -1,8 +1,20 @@
-import { initializeApp } from "firebase/app";
+/**
+ * ENGVIVA
+ * Firebase Configuration
+ *
+ * Used by:
+ * - Firebase Authentication
+ * - Google Authentication
+ * - Firestore
+ */
+
+import { initializeApp, getApps, getApp } from "firebase/app";
 
 import {
   getAuth,
   GoogleAuthProvider,
+  setPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 
 import {
@@ -14,7 +26,7 @@ import {
 ========================================================= */
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBu2wV9BoNnoePUWN2yeR7zbe3bY3CR3bY8",
+  apiKey: "AIzaSyBu2wV9BoNnoePUWN2yeR7zawY3jCR3bY8",
   authDomain: "interviq-9cb86.firebaseapp.com",
   projectId: "interviq-9cb86",
   storageBucket: "interviq-9cb86.firebasestorage.app",
@@ -24,20 +36,43 @@ const firebaseConfig = {
 };
 
 /* =========================================================
-   INITIALIZE FIREBASE
+   FIREBASE APP
 ========================================================= */
 
+/*
+ * Prevent duplicate Firebase initialization
+ * during Vite/HMR development.
+ */
+
 const app =
-  initializeApp(
-    firebaseConfig
-  );
+  getApps().length > 0
+    ? getApp()
+    : initializeApp(firebaseConfig);
 
 /* =========================================================
-   AUTHENTICATION
+   AUTH
 ========================================================= */
 
 const auth =
   getAuth(app);
+
+/*
+ * Keep the user signed in across browser refreshes.
+ *
+ * This is important because your application has
+ * dashboard/profile/technical/resume screens that depend
+ * on Firebase's current authenticated user.
+ */
+
+setPersistence(
+  auth,
+  browserLocalPersistence
+).catch((error) => {
+  console.error(
+    "[FIREBASE] Auth persistence setup failed:",
+    error
+  );
+});
 
 /* =========================================================
    GOOGLE AUTH
@@ -47,12 +82,25 @@ const googleProvider =
   new GoogleAuthProvider();
 
 /*
- * Always ask Google for the user's basic profile.
+ * Always allow the user to select
+ * the Google account.
  */
 
 googleProvider.setCustomParameters({
   prompt: "select_account",
 });
+
+/*
+ * Request standard Google profile information.
+ */
+
+googleProvider.addScope(
+  "profile"
+);
+
+googleProvider.addScope(
+  "email"
+);
 
 /* =========================================================
    FIRESTORE
