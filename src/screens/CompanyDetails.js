@@ -1427,9 +1427,9 @@ const goToPractice =
 
         case "technical":
           navigate(
-            `/technical-lab?company=${company}&role=${role}`
-          );
-          break;
+          `/technical-lab/${encodeURIComponent(company.id)}/levels`
+            );
+            break;
 
         /* =================================================
            CODING

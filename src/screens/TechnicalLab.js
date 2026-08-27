@@ -1,38 +1,29 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+﻿import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-/*
-|--------------------------------------------------------------------------
-| ENGVIVA — Technical Lab
-|--------------------------------------------------------------------------
-|
-| STEP 4
-|
-| Backend:
-|   /api/technical/companies
-|   /api/technical/company/:companyId
-|   /api/technical/company/:companyId/modules
-|   /api/technical/company/:companyId/levels
-|
-| This screen intentionally does NOT contain question data.
-| Everything comes from the backend.
-|
-|--------------------------------------------------------------------------
-*/
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+
+/* =========================================================
+   CONFIG
+========================================================= */
 
 const API_BASE =
-  (
-    import.meta.env.VITE_API_URL ||
-    "https://engviva-backend.onrender.com"
-  ).replace(/\/+$/, "");
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_BACKEND_URL ||
+  "https://engviva-backend.onrender.com";
 
-/*
-|--------------------------------------------------------------------------
-| Helpers
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   HELPERS
+========================================================= */
 
-function normalizeCompanyId(value) {
+function normalizeId(value) {
   return String(value || "")
     .trim()
     .toLowerCase()
@@ -40,135 +31,176 @@ function normalizeCompanyId(value) {
     .replace(/^-+|-+$/g, "");
 }
 
-function formatNumber(value) {
-  return Number(value || 0).toLocaleString();
+function safeNumber(value, fallback = 0) {
+  const n = Number(value);
+
+  return Number.isFinite(n)
+    ? n
+    : fallback;
 }
 
-function getInitials(name) {
-  if (!name) return "EN";
-
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+function getDomain(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .split("/")[0];
 }
 
-function getModuleTone(module) {
-  const name = String(module?.name || "").toLowerCase();
+/* =========================================================
+   FIREBASE TOKEN
+========================================================= */
 
-  if (
-    name.includes("python") ||
-    name.includes("java") ||
-    name.includes("c++")
-  ) {
-    return "programming";
-  }
-
-  if (
-    name.includes("sql") ||
-    name.includes("mysql") ||
-    name.includes("mongo") ||
-    name.includes("database")
-  ) {
-    return "database";
-  }
-
-  if (
-    name.includes("git") ||
-    name.includes("linux") ||
-    name.includes("cloud")
-  ) {
-    return "systems";
-  }
-
-  if (
-    name.includes("machine") ||
-    name.includes("ai") ||
-    name.includes("deep")
-  ) {
-    return "ai";
-  }
-
-  if (
-    name.includes("adobe") ||
-    name.includes("photoshop") ||
-    name.includes("illustrator")
-  ) {
-    return "creative";
-  }
-
-  return "general";
-}
-
-/*
-|--------------------------------------------------------------------------
-| API helper
-|--------------------------------------------------------------------------
-*/
-
-async function apiFetch(path, options = {}) {
-  const response = await fetch(
-    `${API_BASE}${path}`,
-    {
-      ...options,
-      headers: {
-        Accept: "application/json",
-        ...(options.headers || {}),
-      },
-    }
-  );
-
-  let data = null;
-
+async function getFirebaseToken() {
   try {
-    data = await response.json();
-  } catch {
-    data = null;
+    const firebase =
+      await import("../firebase");
+
+    const auth =
+      firebase.auth ||
+      firebase.default?.auth ||
+      null;
+
+    if (!auth?.currentUser) {
+      return null;
+    }
+
+    return await auth.currentUser.getIdToken();
+  } catch (error) {
+    console.warn(
+      "[TECHNICAL LAB AUTH]",
+      error
+    );
+
+    return null;
   }
+}
+
+/* =========================================================
+   API
+========================================================= */
+
+async function apiFetch(
+  path,
+  options = {}
+) {
+  const token =
+    await getFirebaseToken();
+
+  const headers = {
+    Accept: "application/json",
+
+    ...(options.body
+      ? {
+          "Content-Type":
+            "application/json",
+        }
+      : {}),
+
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    headers.Authorization =
+      `Bearer ${token}`;
+  }
+
+  const response =
+    await fetch(
+      `${API_BASE}${path}`,
+      {
+        ...options,
+        headers,
+      }
+    );
+
+  const payload =
+    await response
+      .json()
+      .catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(
-      data?.error ||
-        `Request failed with status ${response.status}`
-    );
+    const message =
+      payload?.error?.message ||
+      payload?.error ||
+      payload?.message ||
+      `Request failed (${response.status})`;
+
+    const error =
+      new Error(message);
+
+    error.status =
+      response.status;
+
+    throw error;
   }
 
-  if (data?.success === false) {
-    throw new Error(
-      data?.error ||
-        "Backend request failed"
-    );
-  }
-
-  return data;
+  return payload;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Styles
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   LOGO
+========================================================= */
 
-const styles = `
-.technical-lab {
+function CompanyLogo({
+  company,
+  large = false,
+}) {
+  const domain =
+    getDomain(
+      company?.domain ||
+      company?.website ||
+      ""
+    );
+
+  if (!domain) {
+    return (
+      <div
+        className={
+          large
+            ? "company-logo company-logo-large"
+            : "company-logo"
+        }
+      >
+        {String(
+          company?.name || "?"
+        )
+          .charAt(0)
+          .toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      className={
+        large
+          ? "company-logo company-logo-large"
+          : "company-logo"
+      }
+      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=256`}
+      alt=""
+      onError={(event) => {
+        event.currentTarget.style.display =
+          "none";
+      }}
+    />
+  );
+}
+
+/* =========================================================
+   STYLES
+========================================================= */
+
+const CSS = `
+* {
+  box-sizing: border-box;
+}
+
+.technical-page {
   min-height: 100vh;
-  width: 100%;
-  background:
-    radial-gradient(
-      circle at 10% 0%,
-      rgba(105, 85, 255, 0.16),
-      transparent 30%
-    ),
-    radial-gradient(
-      circle at 90% 10%,
-      rgba(0, 220, 255, 0.10),
-      transparent 28%
-    ),
-    #08090d;
-  color: #f6f7fb;
+  background: #f7f3ff;
+  color: #28233a;
   font-family:
     Inter,
     ui-sans-serif,
@@ -179,569 +211,476 @@ const styles = `
     sans-serif;
 }
 
-.technical-lab *,
-.technical-lab *::before,
-.technical-lab *::after {
-  box-sizing: border-box;
+.technical-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+
+  background: rgba(247,243,255,.92);
+  backdrop-filter: blur(18px);
+
+  border-bottom:
+    1px solid #e7def5;
+
+  padding:
+    18px
+    clamp(18px,4vw,56px);
 }
 
-.technical-shell {
-  width: min(1480px, 100%);
-  margin: 0 auto;
-  padding: 28px 28px 80px;
-}
+.technical-header-inner {
+  max-width: 1320px;
+  margin: auto;
 
-.technical-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 28px;
+  gap: 20px;
 }
 
-.technical-back {
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.045);
-  color: #fff;
-  border-radius: 14px;
-  padding: 11px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
-  transition: .2s ease;
-}
-
-.technical-back:hover {
-  background: rgba(255,255,255,.09);
-  transform: translateY(-1px);
-}
-
-.technical-api-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(255,255,255,.08);
-  background: rgba(255,255,255,.035);
-  border-radius: 999px;
-  padding: 8px 12px;
-  color: #aeb5c5;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.technical-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #63e6a5;
-  box-shadow: 0 0 14px rgba(99,230,165,.7);
-}
-
-.technical-status-dot.offline {
-  background: #ff5c7a;
-  box-shadow: 0 0 14px rgba(255,92,122,.55);
-}
-
-.technical-hero {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,.09);
-  border-radius: 28px;
-  padding: 34px;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255,255,255,.075),
-      rgba(255,255,255,.025)
-    );
-  box-shadow:
-    0 28px 80px rgba(0,0,0,.32);
-}
-
-.technical-hero::after {
-  content: "";
-  position: absolute;
-  width: 380px;
-  height: 380px;
-  right: -180px;
-  top: -210px;
-  border-radius: 50%;
-  background: rgba(113, 88, 255, .12);
-  filter: blur(30px);
-  pointer-events: none;
-}
-
-.technical-hero-content {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 28px;
-}
-
-.technical-company {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin-bottom: 18px;
-}
-
-.technical-company-logo {
-  width: 64px;
-  height: 64px;
-  flex: 0 0 64px;
-  display: grid;
-  place-items: center;
-  border-radius: 19px;
-  background:
-    linear-gradient(
-      135deg,
-      #6c5ce7,
-      #3c8cff
-    );
-  color: #fff;
-  font-size: 20px;
-  font-weight: 900;
-  box-shadow:
-    0 14px 34px rgba(76,91,255,.28);
-}
-
-.technical-eyebrow {
-  margin: 0 0 6px;
-  color: #8d96ab;
-  text-transform: uppercase;
-  letter-spacing: .14em;
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.technical-title {
-  margin: 0;
-  font-size: clamp(32px, 5vw, 58px);
-  line-height: .98;
-  letter-spacing: -.045em;
-  font-weight: 900;
-}
-
-.technical-description {
-  max-width: 760px;
-  margin: 18px 0 0;
-  color: #aeb5c5;
-  font-size: 15px;
-  line-height: 1.7;
-}
-
-.technical-hero-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(130px, 1fr));
-  gap: 10px;
-}
-
-.technical-stat {
-  min-width: 140px;
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 17px;
-  padding: 17px;
-  background: rgba(0,0,0,.18);
-}
-
-.technical-stat-label {
-  color: #80899d;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .09em;
-}
-
-.technical-stat-value {
-  margin-top: 8px;
-  font-size: 25px;
-  line-height: 1;
-  font-weight: 900;
-}
-
-.technical-main-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 22px;
-  margin-top: 22px;
-}
-
-.technical-panel {
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 24px;
-  background: rgba(255,255,255,.035);
-  overflow: hidden;
-}
-
-.technical-panel-head {
-  padding: 22px 24px;
-  border-bottom: 1px solid rgba(255,255,255,.07);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 14px;
 }
 
-.technical-panel-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: -.02em;
+.back-button {
+  border: 1px solid #ddd2ef;
+  background: #ffffff;
+  color: #51466b;
+
+  width: 42px;
+  height: 42px;
+
+  border-radius: 13px;
+
+  cursor: pointer;
+
+  font-size: 20px;
 }
 
-.technical-panel-subtitle {
-  margin: 5px 0 0;
-  color: #858ea2;
-  font-size: 12px;
-  line-height: 1.5;
+.back-button:hover {
+  background: #f0e8fb;
 }
 
-.technical-module-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(
-      auto-fill,
-      minmax(230px, 1fr)
-    );
-  gap: 12px;
-  padding: 20px;
-}
-
-.technical-module {
-  position: relative;
-  min-height: 145px;
-  border: 1px solid rgba(255,255,255,.075);
-  border-radius: 18px;
-  padding: 18px;
-  background:
-    linear-gradient(
-      145deg,
-      rgba(255,255,255,.055),
-      rgba(255,255,255,.018)
-    );
-  transition:
-    transform .2s ease,
-    border-color .2s ease,
-    background .2s ease;
-}
-
-.technical-module:hover {
-  transform: translateY(-3px);
-  border-color: rgba(131,111,255,.42);
-  background:
-    linear-gradient(
-      145deg,
-      rgba(121,105,255,.10),
-      rgba(255,255,255,.025)
-    );
-}
-
-.technical-module-icon {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  margin-bottom: 14px;
-  background: rgba(255,255,255,.08);
-  font-size: 16px;
-}
-
-.technical-module-icon.programming {
-  background: rgba(100,130,255,.13);
-}
-
-.technical-module-icon.database {
-  background: rgba(74,211,169,.12);
-}
-
-.technical-module-icon.systems {
-  background: rgba(255,187,79,.12);
-}
-
-.technical-module-icon.ai {
-  background: rgba(190,103,255,.14);
-}
-
-.technical-module-icon.creative {
-  background: rgba(255,108,161,.13);
-}
-
-.technical-module-name {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 850;
-}
-
-.technical-module-count {
-  margin-top: 7px;
-  color: #858ea2;
-  font-size: 12px;
-}
-
-.technical-module-image {
-  position: absolute;
-  right: 15px;
-  top: 15px;
-  padding: 5px 7px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.07);
-  color: #b7bdcc;
-  font-size: 10px;
+.brand-kicker {
+  font-size: 11px;
   font-weight: 800;
+
+  letter-spacing: .14em;
+
+  color: #9278bd;
 }
 
-.technical-side {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.brand-title {
+  margin-top: 2px;
+
+  font-size: 20px;
+  font-weight: 900;
+
+  color: #28233a;
 }
 
-.technical-readiness {
-  padding: 22px;
+.technical-main {
+  max-width: 1320px;
+  margin: auto;
+
+  padding:
+    42px
+    clamp(18px,4vw,56px)
+    80px;
 }
 
-.technical-readiness-score {
+.hero {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+
+  gap: 30px;
+
+  margin-bottom: 34px;
 }
 
-.technical-readiness-number {
-  font-size: 46px;
-  line-height: .9;
-  font-weight: 950;
-  letter-spacing: -.05em;
-}
-
-.technical-readiness-caption {
-  color: #80899d;
+.hero-kicker {
   font-size: 12px;
-  margin-bottom: 5px;
-}
-
-.technical-progress {
-  height: 8px;
-  margin-top: 18px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.07);
-  overflow: hidden;
-}
-
-.technical-progress-fill {
-  height: 100%;
-  border-radius: inherit;
-  background:
-    linear-gradient(
-      90deg,
-      #725cff,
-      #4fa8ff
-    );
-  transition: width .5s ease;
-}
-
-.technical-readiness-text {
-  margin-top: 12px;
-  color: #8d96ab;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.technical-action {
-  width: 100%;
-  border: 0;
-  border-radius: 15px;
-  padding: 14px 17px;
-  color: #fff;
-  background:
-    linear-gradient(
-      135deg,
-      #725cff,
-      #4b91ff
-    );
-  font-size: 13px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: .2s ease;
-}
-
-.technical-action:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 14px 30px rgba(80,91,255,.23);
-}
-
-.technical-action.secondary {
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.08);
-}
-
-.technical-action:disabled {
-  cursor: not-allowed;
-  opacity: .5;
-  transform: none;
-}
-
-.technical-missing {
-  padding: 22px;
-}
-
-.technical-missing-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 14px;
-}
-
-.technical-missing-chip {
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 999px;
-  padding: 7px 9px;
-  color: #8d96ab;
-  background: rgba(255,255,255,.035);
-  font-size: 10px;
-  font-weight: 750;
-}
-
-.technical-note {
-  padding: 18px 20px;
-  border-radius: 18px;
-  border: 1px solid rgba(90,162,255,.13);
-  background: rgba(90,162,255,.055);
-  color: #9ba9c0;
-  font-size: 12px;
-  line-height: 1.65;
-}
-
-.technical-error {
-  margin-top: 22px;
-  border: 1px solid rgba(255,75,108,.22);
-  border-radius: 18px;
-  padding: 18px;
-  background: rgba(255,75,108,.07);
-  color: #ff9aad;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.technical-retry {
-  margin-top: 12px;
-  border: 1px solid rgba(255,255,255,.10);
-  border-radius: 11px;
-  padding: 9px 12px;
-  color: #fff;
-  background: rgba(255,255,255,.06);
-  cursor: pointer;
   font-weight: 800;
+
+  letter-spacing: .16em;
+
+  color: #9a7bc7;
 }
 
-.technical-loading {
-  min-height: 70vh;
-  display: grid;
-  place-items: center;
-  padding: 30px;
+.hero h1 {
+  margin:
+    8px
+    0
+    10px;
+
+  font-size:
+    clamp(34px,5vw,58px);
+
+  line-height: 1;
+
+  letter-spacing: -.04em;
 }
 
-.technical-loader-card {
-  width: min(460px, 100%);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 24px;
-  padding: 28px;
-  background: rgba(255,255,255,.04);
-  text-align: center;
+.hero p {
+  max-width: 700px;
+
+  margin: 0;
+
+  color: #7c738e;
+
+  font-size: 15px;
+  line-height: 1.6;
 }
 
-.technical-spinner {
-  width: 34px;
-  height: 34px;
-  margin: 0 auto 18px;
+.status-pill {
+  flex-shrink: 0;
+
+  border:
+    1px solid #dfd1ef;
+
+  background: #ffffff;
+
+  border-radius: 999px;
+
+  padding:
+    9px
+    14px;
+
+  color: #76638f;
+
+  font-size: 11px;
+  font-weight: 800;
+
+  letter-spacing: .08em;
+}
+
+.error-card {
+  margin-bottom: 24px;
+
+  padding: 18px 20px;
+
+  border:
+    1px solid #e4b8cf;
+
+  background: #fff6fa;
+
+  color: #9d3f69;
+
+  border-radius: 18px;
+
+  font-weight: 700;
+}
+
+.loading-card {
+  min-height: 400px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #8d809e;
+
+  font-weight: 700;
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+
+  border:
+    3px solid #dfd5ea;
+
+  border-top-color: #9b7ac7;
+
   border-radius: 50%;
-  border: 3px solid rgba(255,255,255,.10);
-  border-top-color: #7c67ff;
+
   animation:
-    technical-spin .8s linear infinite;
+    spin .8s linear infinite;
+
+  margin-right: 12px;
 }
 
-@keyframes technical-spin {
+@keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-.technical-empty {
-  padding: 50px 25px;
+.company-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(260px, 1fr)
+    );
+
+  gap: 18px;
+}
+
+.company-card {
+  border:
+    1px solid #e5dcef;
+
+  background: rgba(255,255,255,.86);
+
+  border-radius: 24px;
+
+  padding: 24px;
+
+  cursor: pointer;
+
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    box-shadow .18s ease;
+}
+
+.company-card:hover {
+  transform: translateY(-3px);
+
+  border-color: #c9afe7;
+
+  box-shadow:
+    0 16px 42px
+    rgba(107,76,143,.10);
+}
+
+.company-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 24px;
+}
+
+.company-logo {
+  width: 48px;
+  height: 48px;
+
+  object-fit: contain;
+
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  border:
+    1px solid #e5dcef;
+
+  padding: 9px;
+}
+
+.company-logo-large {
+  width: 66px;
+  height: 66px;
+
+  border-radius: 18px;
+
+  padding: 12px;
+}
+
+.company-arrow {
+  font-size: 24px;
+  color: #a78bc7;
+}
+
+.company-name {
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.company-category {
+  margin-top: 5px;
+
+  color: #8b819a;
+
+  font-size: 12px;
+}
+
+.company-stats {
+  display: flex;
+  gap: 8px;
+
+  margin-top: 20px;
+
+  flex-wrap: wrap;
+}
+
+.stat {
+  padding:
+    7px
+    10px;
+
+  border-radius: 9px;
+
+  background: #f5effc;
+
+  color: #77658c;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: .04em;
+}
+
+.company-hero {
+  display: flex;
+
+  align-items: center;
+
+  gap: 20px;
+
+  padding: 24px;
+
+  margin-bottom: 28px;
+
+  border:
+    1px solid #e5dcef;
+
+  background: #ffffff;
+
+  border-radius: 24px;
+}
+
+.company-hero h2 {
+  margin:
+    0
+    0
+    5px;
+
+  font-size: 25px;
+}
+
+.company-hero p {
+  margin: 0;
+
+  color: #847a91;
+
+  font-size: 13px;
+}
+
+.level-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(280px,1fr)
+    );
+
+  gap: 16px;
+}
+
+.level-card {
+  border:
+    1px solid #e5dcef;
+
+  background: #ffffff;
+
+  border-radius: 20px;
+
+  padding: 22px;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    transform .18s ease,
+    border-color .18s ease;
+}
+
+.level-card:hover {
+  transform: translateY(-2px);
+
+  border-color: #c9afe7;
+}
+
+.level-number {
+  color: #a17acb;
+
+  font-size: 11px;
+  font-weight: 900;
+
+  letter-spacing: .12em;
+}
+
+.level-title {
+  margin-top: 7px;
+
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.level-meta {
+  display: flex;
+
+  gap: 8px;
+
+  margin-top: 15px;
+
+  flex-wrap: wrap;
+}
+
+.level-pill {
+  padding:
+    6px
+    9px;
+
+  border-radius: 8px;
+
+  background: #f6f0fc;
+
+  color: #766486;
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.level-arrow {
+  margin-top: 18px;
+
+  color: #9d7bc5;
+
+  font-size: 20px;
+}
+
+.empty-card {
+  padding: 50px;
+
   text-align: center;
-  color: #8992a6;
+
+  border:
+    1px dashed #d9cae8;
+
+  border-radius: 20px;
+
+  color: #877c94;
+
+  background: rgba(255,255,255,.55);
 }
 
-@media (max-width: 1050px) {
-  .technical-main-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 700px) {
+  .hero {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  .technical-side {
-    display: grid;
-    grid-template-columns:
-      repeat(
-        2,
-        minmax(0, 1fr)
-      );
-  }
-}
-
-@media (max-width: 760px) {
-  .technical-shell {
-    padding: 18px 14px 50px;
-  }
-
-  .technical-topbar {
+  .company-hero {
     align-items: flex-start;
   }
 
-  .technical-hero {
-    padding: 23px;
-    border-radius: 21px;
-  }
-
-  .technical-hero-content {
-    grid-template-columns: 1fr;
-  }
-
-  .technical-hero-stats {
-    grid-template-columns:
-      repeat(
-        2,
-        1fr
-      );
-  }
-
-  .technical-stat {
-    min-width: 0;
-  }
-
-  .technical-side {
-    grid-template-columns: 1fr;
-  }
-
-  .technical-module-grid {
-    grid-template-columns: 1fr;
-    padding: 14px;
-  }
-
-  .technical-title {
-    font-size: 37px;
+  .technical-main {
+    padding-top: 28px;
   }
 }
 `;
 
-/*
-|--------------------------------------------------------------------------
-| Component
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   COMPONENT
+========================================================= */
 
 export default function TechnicalLab() {
   const navigate =
@@ -750,41 +689,17 @@ export default function TechnicalLab() {
   const location =
     useLocation();
 
-  const query =
-    useMemo(
-      () =>
-        new URLSearchParams(
-          location.search
-        ),
-      [location.search]
+  const {
+    companyId: routeCompanyId,
+  } = useParams();
+
+  const companyId =
+    normalizeId(
+      routeCompanyId
     );
 
-  /*
-   * Support:
-   *
-   * ?company=google
-   *
-   * ?companyId=google
-   *
-   * This avoids breaking the existing
-   * CompanyDetails navigation.
-   */
-
-  const companyFromUrl =
-    query.get("company") ||
-    query.get("companyId") ||
-    "";
-
-  const roleFromUrl =
-    query.get("role") ||
-    "Software Engineer";
-
-  const [companyId, setCompanyId] =
-    useState(
-      normalizeCompanyId(
-        companyFromUrl
-      )
-    );
+  const isLevelsPage =
+    Boolean(companyId);
 
   const [companies, setCompanies] =
     useState([]);
@@ -793,13 +708,10 @@ export default function TechnicalLab() {
     useState(null);
 
   const [levels, setLevels] =
-    useState(null);
+    useState([]);
 
   const [loading, setLoading] =
     useState(true);
-
-  const [companyLoading, setCompanyLoading] =
-    useState(false);
 
   const [error, setError] =
     useState("");
@@ -807,865 +719,559 @@ export default function TechnicalLab() {
   const [backendOnline, setBackendOnline] =
     useState(false);
 
-  /*
-   * Load companies.
-   */
+  /* =======================================================
+     LOAD COMPANIES
+  ======================================================= */
 
-  async function loadCompanies() {
-    try {
-      setError("");
-
-      const data =
-        await apiFetch(
-          "/api/technical/companies"
-        );
-
-      setCompanies(
-        data.companies || []
-      );
-
-      setBackendOnline(true);
-
-      /*
-       * If URL didn't provide a company,
-       * don't silently pick a random company.
-       *
-       * Show the company selector.
-       */
-
-      if (
-        !companyId &&
-        data.companies?.length
-      ) {
-        const first =
-          data.companies[0];
-
-        setCompanyId(
-          first.id
-        );
-      }
-    } catch (err) {
-      console.error(
-        "[TechnicalLab] companies:",
-        err
-      );
-
-      setBackendOnline(false);
-
-      setError(
-        err.message ||
-          "Unable to connect to technical training backend."
-      );
-    }
-  }
-
-  /*
-   * Load selected company.
-   */
-
-  async function loadCompany(
-    selectedCompanyId
-  ) {
-    if (!selectedCompanyId) {
+  useEffect(() => {
+    if (isLevelsPage) {
       return;
     }
 
-    try {
-      setCompanyLoading(true);
-      setError("");
+    let cancelled = false;
 
-      const [
-        companyData,
-        levelData,
-      ] =
-        await Promise.all([
-          apiFetch(
-            `/api/technical/company/${encodeURIComponent(
-              selectedCompanyId
-            )}`
-          ),
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
 
-          apiFetch(
-            `/api/technical/company/${encodeURIComponent(
-              selectedCompanyId
-            )}/levels`
-          ),
-        ]);
+        const payload =
+          await apiFetch(
+            "/api/technical/companies"
+          );
 
-      setCompany(
-        companyData
-      );
+        if (cancelled) {
+          return;
+        }
 
-      setLevels(
-        levelData
-      );
+        setCompanies(
+          Array.isArray(
+            payload?.companies
+          )
+            ? payload.companies
+            : []
+        );
 
-      setBackendOnline(true);
-    } catch (err) {
-      console.error(
-        "[TechnicalLab] company:",
-        err
-      );
+        setBackendOnline(true);
+      } catch (err) {
+        if (!cancelled) {
+          console.error(
+            "[TECHNICAL LAB COMPANIES]",
+            err
+          );
 
-      setBackendOnline(false);
+          setError(
+            err.message ||
+              "Unable to load technical companies."
+          );
 
-      setCompany(null);
-      setLevels(null);
-
-      setError(
-        err.message ||
-          "Unable to load this company's technical profile."
-      );
-    } finally {
-      setCompanyLoading(false);
-      setLoading(false);
+          setBackendOnline(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLevelsPage]);
+
+  /* =======================================================
+     LOAD COMPANY + LEVELS
+  ======================================================= */
+
+  useEffect(() => {
+    if (!isLevelsPage) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const encoded =
+          encodeURIComponent(
+            companyId
+          );
+
+        const [
+          companyPayload,
+          levelsPayload,
+        ] =
+          await Promise.all([
+            apiFetch(
+              `/api/technical/company/${encoded}`
+            ),
+
+            apiFetch(
+              `/api/technical/company/${encoded}/levels`
+            ),
+          ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setCompany(
+          companyPayload?.company ||
+          companyPayload ||
+          null
+        );
+
+        setLevels(
+          Array.isArray(
+            levelsPayload?.levels
+          )
+            ? levelsPayload.levels
+            : []
+        );
+
+        setBackendOnline(true);
+      } catch (err) {
+        if (!cancelled) {
+          console.error(
+            "[TECHNICAL LAB COMPANY]",
+            err
+          );
+
+          setCompany(null);
+          setLevels([]);
+
+          setError(
+            err.message ||
+              "Unable to load this company's technical levels."
+          );
+
+          setBackendOnline(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isLevelsPage,
+    companyId,
+  ]);
+
+  /* =======================================================
+     SELECT COMPANY
+  ======================================================= */
+
+  function openCompany(item) {
+    const id =
+      normalizeId(item?.id);
+
+    if (!id) {
+      return;
+    }
+
+    navigate(
+      `/technical-lab/${encodeURIComponent(
+        id
+      )}/levels`
+    );
   }
 
-  /*
-   * Initial load.
-   */
+  /* =======================================================
+     OPEN LEVEL
+  ======================================================= */
 
-  useEffect(() => {
-    loadCompanies();
-  }, []);
+  function openLevel(level) {
+    const number =
+      safeNumber(
+        level?.level ??
+        level?.levelNumber,
+        0
+      );
 
-  /*
-   * Load company whenever
-   * selected ID changes.
-   */
+    if (
+      !companyId ||
+      !number
+    ) {
+      return;
+    }
 
-  useEffect(() => {
-    if (companyId) {
-      loadCompany(
+    navigate(
+      `/technical-lab/${encodeURIComponent(
         companyId
+      )}/level/${number}`
+    );
+  }
+
+  /* =======================================================
+     BACK
+  ======================================================= */
+
+  function goBack() {
+    if (isLevelsPage) {
+      navigate(
+        "/technical-lab",
+        {
+          replace: true,
+        }
       );
+
+      return;
     }
-  }, [companyId]);
 
-  /*
-   * Company object from API.
-   */
-
-  const companyInfo =
-    company?.company || null;
-
-  const modules =
-    company?.modules || [];
-
-  const missingModules =
-    company?.missingModules || [];
-
-  const summary =
-    company?.summary || {};
-
-  /*
-   * Coverage.
-   */
-
-  const coverage =
-    summary.configuredModules > 0
-      ? Math.round(
-          (summary.availableModules /
-            summary.configuredModules) *
-            100
-        )
-      : 0;
-
-  /*
-   * Total question pool.
-   */
-
-  const totalQuestions =
-    summary.questionCount || 0;
-
-  /*
-   * Selected company in dropdown.
-   */
-
-  const selectedCompany =
-    companies.find(
-      (item) =>
-        item.id === companyId
+    navigate(
+      "/dashboard",
+      {
+        replace: true,
+      }
     );
-
-  /*
-   * Navigate to levels.
-   *
-   * Step 5 will consume this route.
-   */
-function openLevels() {
-  const id = normalizeCompanyId(companyId);
-
-  if (!id) {
-    setError("Please select a company first.");
-    return;
   }
 
-  navigate(
-    `/technical-lab/${encodeURIComponent(id)}/levels`,
-    {
-      replace: true,
-      state: {
-        companyId: id,
-        role: roleFromUrl,
-      },
-    }
-  );
-}  /*
-   * Keep a safe fallback route if
-   * your router doesn't use the path above.
-   *
-   * We don't start the assessment here.
-   */
-function handleBack() {
-  navigate("/dashboard");
-}
+  /* =======================================================
+     LOADING
+  ======================================================= */
 
-  /*
-   * Loading.
-   */
-
-  if (
-    loading &&
-    !company
-  ) {
+  if (loading) {
     return (
-      <>
-        <style>
-          {styles}
-        </style>
+      <div className="technical-page">
+        <style>{CSS}</style>
 
-        <div className="technical-lab">
-          <div className="technical-loading">
-            <div className="technical-loader-card">
-              <div className="technical-spinner" />
+        <div className="loading-card">
+          <div className="spinner" />
 
-              <div
-                style={{
-                  fontSize: 17,
-                  fontWeight: 900,
-                }}
-              >
-                Loading Technical Lab
-              </div>
-
-              <div
-                style={{
-                  marginTop: 8,
-                  color: "#858ea2",
-                  fontSize: 12,
-                }}
-              >
-                Connecting to ENGVIVA technical
-                training engine...
-              </div>
-            </div>
-          </div>
+          <span>
+            Loading technical training...
+          </span>
         </div>
-      </>
+      </div>
     );
   }
 
-  return (
-    <>
-      <style>
-        {styles}
-      </style>
+  /* =======================================================
+     ERROR
+  ======================================================= */
 
-      <main className="technical-lab">
-        <div className="technical-shell">
+  if (error) {
+    return (
+      <div className="technical-page">
+        <style>{CSS}</style>
 
-          {/* =================================================
-              TOP BAR
-          ================================================= */}
+        <header className="technical-header">
+          <div className="technical-header-inner">
+            <div className="header-left">
+              <button
+                className="back-button"
+                onClick={goBack}
+              >
+                ←
+              </button>
 
-          <div className="technical-topbar">
-            <button
-              type="button"
-              className="technical-back"
-              onClick={handleBack}
-            >
-              ← Back
-            </button>
+              <div>
+                <div className="brand-kicker">
+                  ENGVIVA
+                </div>
 
-            <div className="technical-api-status">
-              <span
-                className={`technical-status-dot ${
-                  backendOnline
-                    ? ""
-                    : "offline"
-                }`}
-              />
-
-              {backendOnline
-                ? "Technical engine online"
-                : "Technical engine offline"}
+                <div className="brand-title">
+                  Technical Lab
+                </div>
+              </div>
             </div>
           </div>
+        </header>
 
-          {/* =================================================
-              ERROR
-          ================================================= */}
+        <main className="technical-main">
+          <div className="error-card">
+            {error}
+          </div>
 
-          {error && (
-            <div className="technical-error">
-              <strong>
-                Unable to load Technical Lab
-              </strong>
+          <button
+            className="back-button"
+            onClick={() =>
+              window.location.reload()
+            }
+          >
+            Retry
+          </button>
+        </main>
+      </div>
+    );
+  }
 
-              <div
-                style={{
-                  marginTop: 5,
-                }}
-              >
-                {error}
-              </div>
+  /* =======================================================
+     LEVELS
+  ======================================================= */
 
+  if (isLevelsPage) {
+    const companyName =
+      company?.name ||
+      company?.company?.name ||
+      companyId;
+
+    return (
+      <div className="technical-page">
+        <style>{CSS}</style>
+
+        <header className="technical-header">
+          <div className="technical-header-inner">
+            <div className="header-left">
               <button
-                type="button"
-                className="technical-retry"
-                onClick={() => {
-                  loadCompanies();
-
-                  if (companyId) {
-                    loadCompany(
-                      companyId
-                    );
-                  }
-                }}
+                className="back-button"
+                onClick={goBack}
               >
-                Retry
+                ←
               </button>
+
+              <div>
+                <div className="brand-kicker">
+                  TECHNICAL ROUND
+                </div>
+
+                <div className="brand-title">
+                  {companyName}
+                </div>
+              </div>
             </div>
-          )}
 
-          {/* =================================================
-              HERO
-          ================================================= */}
+            <div className="status-pill">
+              {levels.length} LEVELS
+            </div>
+          </div>
+        </header>
 
-          <section className="technical-hero">
-            <div className="technical-hero-content">
+        <main className="technical-main">
+          <section className="company-hero">
+            <CompanyLogo
+              company={company}
+              large
+            />
 
-              <div>
-                <div className="technical-company">
-                  <div className="technical-company-logo">
-                    {getInitials(
-                      companyInfo?.name ||
-                        selectedCompany?.name ||
-                        "ENGVIVA"
-                    )}
-                  </div>
+            <div>
+              <h2>
+                {companyName}
+              </h2>
 
-                  <div>
-                    <p className="technical-eyebrow">
-                      Technical Lab
-                    </p>
-
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: "#aeb5c5",
-                        fontWeight: 750,
-                      }}
-                    >
-                      {companyInfo?.category ||
-                        selectedCompany?.category ||
-                        "Engineering"}
-                    </div>
-                  </div>
-                </div>
-
-                <h1 className="technical-title">
-                  {companyInfo?.name ||
-                    selectedCompany?.name ||
-                    "Technical Training"}
-                </h1>
-
-                <p className="technical-description">
-                  Train against the technical skill
-                  profile configured for this company.
-                  Questions come from the verified
-                  ENGVIVA technical dataset — not
-                  hardcoded frontend content.
-                </p>
-
-                {roleFromUrl && (
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      marginTop: 17,
-                      borderRadius: 999,
-                      padding:
-                        "8px 11px",
-                      background:
-                        "rgba(255,255,255,.055)",
-                      border:
-                        "1px solid rgba(255,255,255,.08)",
-                      color: "#aeb5c5",
-                      fontSize: 11,
-                      fontWeight: 800,
-                    }}
-                  >
-                    Target role · {roleFromUrl}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <div
-                  style={{
-                    color: "#858ea2",
-                    fontSize: 11,
-                    fontWeight: 850,
-                    marginBottom: 8,
-                    textTransform:
-                      "uppercase",
-                    letterSpacing: ".1em",
-                  }}
-                >
-                  Change company
-                </div>
-
-                <select
-                  value={
-                    companyId || ""
-                  }
-                  onChange={(event) => {
-                    const next =
-                      normalizeCompanyId(
-                        event.target.value
-                      );
-
-                    setCompanyId(
-                      next
-                    );
-
-                    navigate(
-                      `/technical-lab?company=${encodeURIComponent(
-                        next
-                      )}&role=${encodeURIComponent(
-                        roleFromUrl
-                      )}`,
-                      {
-                        replace: true,
-                      }
-                    );
-                  }}
-                  style={{
-                    width: 230,
-                    maxWidth: "100%",
-                    border:
-                      "1px solid rgba(255,255,255,.10)",
-                    borderRadius: 13,
-                    padding:
-                      "12px 13px",
-                    background:
-                      "#151720",
-                    color: "#fff",
-                    outline: "none",
-                    fontWeight: 750,
-                    fontSize: 13,
-                  }}
-                >
-                  {!companies.length && (
-                    <option value="">
-                      No companies loaded
-                    </option>
-                  )}
-
-                  {companies.map(
-                    (item) => (
-                      <option
-                        key={item.id}
-                        value={item.id}
-                      >
-                        {item.name}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
+              <p>
+                Select a technical assessment
+                level to begin.
+              </p>
             </div>
           </section>
 
-          {/* =================================================
-              MAIN
-          ================================================= */}
-
-          {companyLoading ? (
-            <div
-              className="technical-loading"
-              style={{
-                minHeight: 350,
-              }}
-            >
-              <div className="technical-loader-card">
-                <div className="technical-spinner" />
-
-                <div
-                  style={{
-                    fontWeight: 900,
-                  }}
-                >
-                  Loading {selectedCompany?.name ||
-                    "company"}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 7,
-                    color: "#858ea2",
-                    fontSize: 12,
-                  }}
-                >
-                  Resolving the live technical
-                  question pool...
-                </div>
-              </div>
-            </div>
-          ) : company ? (
-            <div className="technical-main-grid">
-
-              {/* ===========================================
-                  MODULES
-              =========================================== */}
-
-              <section className="technical-panel">
-                <div className="technical-panel-head">
-                  <div>
-                    <h2 className="technical-panel-title">
-                      Technical Skill Modules
-                    </h2>
-
-                    <p className="technical-panel-subtitle">
-                      {modules.length} active modules ·{" "}
-                      {formatNumber(
-                        totalQuestions
-                      )}{" "}
-                      verified questions available
-                    </p>
-                  </div>
-
-                  <div
-                    style={{
-                      color: "#8e98ac",
-                      fontSize: 11,
-                      fontWeight: 800,
-                    }}
-                  >
-                    LIVE DATA
-                  </div>
-                </div>
-
-                {modules.length ? (
-                  <div className="technical-module-grid">
-                    {modules.map(
-                      (module) => {
-                        const tone =
-                          getModuleTone(
-                            module
-                          );
-
-                        return (
-                          <article
-                            key={
-                              module.id
-                            }
-                            className="technical-module"
-                          >
-                            <div
-                              className={`technical-module-icon ${tone}`}
-                            >
-                              {tone ===
-                              "programming"
-                                ? "</>"
-                                : tone ===
-                                  "database"
-                                ? "DB"
-                                : tone ===
-                                  "systems"
-                                ? "SYS"
-                                : tone ===
-                                  "ai"
-                                ? "AI"
-                                : tone ===
-                                  "creative"
-                                ? "✦"
-                                : "◆"}
-                            </div>
-
-                            <h3 className="technical-module-name">
-                              {
-                                module.name
-                              }
-                            </h3>
-
-                            <div className="technical-module-count">
-                              {formatNumber(
-                                module.questionCount
-                              )}{" "}
-                              questions
-                            </div>
-
-                            {module.hasImages && (
-                              <div className="technical-module-image">
-                                {module.imageCount}{" "}
-                                visual
-                                {module.imageCount ===
-                                1
-                                  ? ""
-                                  : "s"}
-                              </div>
-                            )}
-                          </article>
-                        );
-                      }
-                    )}
-                  </div>
-                ) : (
-                  <div className="technical-empty">
-                    No technical modules are currently
-                    available for this company.
-                  </div>
-                )}
-              </section>
-
-              {/* ===========================================
-                  SIDEBAR
-              =========================================== */}
-
-              <aside className="technical-side">
-
-                {/* READINESS */}
-
-                <section className="technical-panel">
-                  <div className="technical-readiness">
-                    <p className="technical-eyebrow">
-                      Dataset Coverage
-                    </p>
-
-                    <div className="technical-readiness-score">
-                      <div className="technical-readiness-number">
-                        {coverage}%
-                      </div>
-
-                      <div className="technical-readiness-caption">
-                        profile covered
-                      </div>
-                    </div>
-
-                    <div className="technical-progress">
-                      <div
-                        className="technical-progress-fill"
-                        style={{
-                          width: `${coverage}%`,
-                        }}
-                      />
-                    </div>
-
-                    <div className="technical-readiness-text">
-                      {summary.availableModules} of{" "}
-                      {summary.configuredModules}{" "}
-                      configured skill modules are
-                      currently backed by the installed
-                      dataset.
-                    </div>
-                  </div>
-                </section>
-
-                {/* LEVELS */}
-
-                <section className="technical-panel">
-                  <div className="technical-readiness">
-                    <p className="technical-eyebrow">
-                      Technical Progression
-                    </p>
-
-                    <h2
-                      style={{
-                        margin:
-                          "7px 0 0",
-                        fontSize: 23,
-                        fontWeight: 900,
-                        letterSpacing:
-                          "-.03em",
-                      }}
-                    >
-                      Open Technical Levels
-                    </h2>
-
-                    <p
-                      style={{
-                        margin:
-                          "10px 0 18px",
-                        color: "#858ea2",
-                        fontSize: 12,
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      The level engine will generate
-                      the real 20–40 level progression
-                      from this company's available
-                      question pool.
-                    </p>
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(3,1fr)",
-                        gap: 7,
-                        marginBottom: 14,
-                      }}
-                    >
-                      <div className="technical-stat">
-                        <div className="technical-stat-label">
-                          Min
-                        </div>
-
-                        <div className="technical-stat-value">
-                          {levels?.levels?.minimum ||
-                            20}
-                        </div>
-                      </div>
-
-                      <div className="technical-stat">
-                        <div className="technical-stat-label">
-                          Max
-                        </div>
-
-                        <div className="technical-stat-value">
-                          {levels?.levels?.maximum ||
-                            40}
-                        </div>
-                      </div>
-
-                      <div className="technical-stat">
-                        <div className="technical-stat-label">
-                          Est.
-                        </div>
-
-                        <div className="technical-stat-value">
-                          {levels?.levels?.estimated ||
-                            "—"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="technical-action"
-                      onClick={
-                        openLevels
-                      }
-                      disabled={
-                        !modules.length
-                      }
-                    >
-                      Open Technical Levels →
-                    </button>
-                  </div>
-                </section>
-
-                {/* MISSING */}
-
-                <section className="technical-panel">
-                  <div className="technical-missing">
-                    <p className="technical-eyebrow">
-                      Expansion Pool
-                    </p>
-
-                    <h2
-                      style={{
-                        margin:
-                          "7px 0 0",
-                        fontSize: 17,
-                        fontWeight: 900,
-                      }}
-                    >
-                      Additional Skills
-                    </h2>
-
-                    <p
-                      style={{
-                        margin:
-                          "8px 0 0",
-                        color: "#858ea2",
-                        fontSize: 11,
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      Configured for this company but
-                      not present in the current dataset.
-                      These are not shown as available
-                      questions.
-                    </p>
-
-                    {missingModules.length ? (
-                      <div className="technical-missing-list">
-                        {missingModules.map(
-                          (module) => (
-                            <span
-                              key={
-                                module
-                              }
-                              className="technical-missing-chip"
-                            >
-                              {module.replace(
-                                /-/g,
-                                " "
-                              )}
-                            </span>
-                          )
-                        )}
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          marginTop: 14,
-                          color:
-                            "#63e6a5",
-                          fontSize: 11,
-                          fontWeight: 800,
-                        }}
-                      >
-                        All configured modules
-                        are available.
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                {/* NOTE */}
-
-                <div className="technical-note">
-                  <strong
-                    style={{
-                      color:
-                        "#d9e2f3",
-                    }}
-                  >
-                    ENGVIVA technical engine
-                  </strong>
-                  <br />
-                  The questions displayed in this
-                  training system come from the backend
-                  dataset. The frontend does not contain
-                  a hardcoded question bank.
-                </div>
-              </aside>
+          {levels.length === 0 ? (
+            <div className="empty-card">
+              No technical assessment levels
+              are currently available for this
+              company.
             </div>
           ) : (
-            <div className="technical-panel">
-              <div className="technical-empty">
-                Select a company to load its technical
-                training profile.
+            <section className="level-grid">
+              {levels.map(
+                (level, index) => {
+                  const number =
+                    safeNumber(
+                      level?.level ??
+                      level?.levelNumber,
+                      index + 1
+                    );
+
+                  const title =
+                    level?.title ||
+                    `Foundation ${number}`;
+
+                  const questionCount =
+                    safeNumber(
+                      level?.questionCount,
+                      0
+                    );
+
+                  const minutes =
+                    safeNumber(
+                      level?.estimatedMinutes,
+                      0
+                    );
+
+                  return (
+                    <button
+                      key={
+                        `${companyId}-${number}`
+                      }
+                      className="level-card"
+                      onClick={() =>
+                        openLevel(
+                          level
+                        )
+                      }
+                    >
+                      <div className="level-number">
+                        LEVEL {number}
+                      </div>
+
+                      <div className="level-title">
+                        {title}
+                      </div>
+
+                      <div className="level-meta">
+                        <span className="level-pill">
+                          {questionCount}
+                          {" "}
+                          QUESTIONS
+                        </span>
+
+                        {minutes > 0 && (
+                          <span className="level-pill">
+                            {minutes}
+                            {" "}
+                            MIN
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="level-arrow">
+                        Start proctored test →
+                      </div>
+                    </button>
+                  );
+                }
+              )}
+            </section>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  /* =======================================================
+     COMPANY LIST
+  ======================================================= */
+
+  return (
+    <div className="technical-page">
+      <style>{CSS}</style>
+
+      <header className="technical-header">
+        <div className="technical-header-inner">
+          <div className="header-left">
+            <button
+              className="back-button"
+              onClick={goBack}
+            >
+              ←
+            </button>
+
+            <div>
+              <div className="brand-kicker">
+                ENGVIVA
+              </div>
+
+              <div className="brand-title">
+                Technical Lab
               </div>
             </div>
-          )}
+          </div>
+
+          <div className="status-pill">
+            {backendOnline
+              ? "LIVE DATASET"
+              : "OFFLINE"}
+          </div>
         </div>
+      </header>
+
+      <main className="technical-main">
+        <section className="hero">
+          <div>
+            <div className="hero-kicker">
+              ENGINEERING PREPARATION
+            </div>
+
+            <h1>
+              Technical Lab
+            </h1>
+
+            <p>
+              Select a company to view its
+              real technical assessment
+              progression.
+            </p>
+          </div>
+
+          <div className="status-pill">
+            DYNAMIC DATASET
+          </div>
+        </section>
+
+        {companies.length === 0 ? (
+          <div className="empty-card">
+            No technical companies are
+            available.
+          </div>
+        ) : (
+          <section className="company-grid">
+            {companies.map(
+              (item) => (
+                <button
+                  key={item.id}
+                  className="company-card"
+                  onClick={() =>
+                    openCompany(item)
+                  }
+                >
+                  <div className="company-card-top">
+                    <CompanyLogo
+                      company={item}
+                    />
+
+                    <span className="company-arrow">
+                      →
+                    </span>
+                  </div>
+
+                  <div className="company-name">
+                    {item.name ||
+                      item.id}
+                  </div>
+
+                  <div className="company-category">
+                    {item.category ||
+                      "Technology"}
+                  </div>
+
+                  <div className="company-stats">
+                    {item.questionCount !==
+                      undefined && (
+                      <span className="stat">
+                        {item.questionCount}
+                        {" "}
+                        QUESTIONS
+                      </span>
+                    )}
+
+                    {item.moduleCount !==
+                      undefined && (
+                      <span className="stat">
+                        {item.moduleCount}
+                        {" "}
+                        MODULES
+                      </span>
+                    )}
+                  </div>
+                </button>
+              )
+            )}
+          </section>
+        )}
       </main>
-    </>
+    </div>
   );
 }

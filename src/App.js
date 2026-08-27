@@ -178,47 +178,34 @@ export default function App() {
           element={<AssessmentTest />}
         />
 
+{/* =========================================================
+    TECHNICAL LAB
+========================================================= */}
 
-        {/* =====================================================
-            TECHNICAL ASSESSMENT
-           
-            ONE COMPONENT
-            FOUR STATES
+              <Route
+        path="/technical-lab"
+        element={<TechnicalAssessment />}
+      />
 
-            /technical-lab
-                -> company list
+      <Route
+        path="/technical-lab/:companyId/levels"
+        element={<TechnicalAssessment />}
+      />
 
-            /technical-lab/google/levels
-                -> Google levels
+      <Route
+        path="/technical-lab/:companyId/level/:levelNumber"
+        element={<TechnicalAssessment />}
+      />
 
-            /technical-lab/google/level/1
-                -> active test
+      <Route
+        path="/technical-lab/:companyId/level/:levelNumber/attempt/:attemptId"
+        element={<TechnicalAssessment />}
+      />
 
-            /technical-lab/google/level/1/result
-                -> result
-        ===================================================== */}
-
-        <Route
-          path="/technical-lab"
-          element={<TechnicalAssessment />}
-        />
-
-        <Route
-          path="/technical-lab/:companyId/levels"
-          element={<TechnicalAssessment />}
-        />
-
-        <Route
-          path="/technical-lab/:companyId/level/:levelNumber"
-          element={<TechnicalAssessment />}
-        />
-
-        <Route
-          path="/technical-lab/:companyId/level/:levelNumber/result"
-          element={<TechnicalAssessment />}
-        />
-
-
+      <Route
+        path="/technical-lab/:companyId/level/:levelNumber/result"
+        element={<TechnicalAssessment />}
+      />
         {/* =====================================================
             CODING
         ===================================================== */}
