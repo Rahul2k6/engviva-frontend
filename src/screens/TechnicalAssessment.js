@@ -800,7 +800,7 @@ const STYLES = `
 }
 
 .technical-eyebrow {
-  color: #a7ff00;
+  color: #6f2de9;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .18em;
@@ -881,7 +881,7 @@ const STYLES = `
 
 .company-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(167,255,0,.45);
+  border-color: rgba(144, 27, 240, 0.92)0.45);
   background: #121212;
 }
 
@@ -932,7 +932,7 @@ const STYLES = `
 }
 
 .tech-logo-fallback {
-  background: #a7ff00;
+  background: #6f2de9;
   color: #080808;
   font-weight: 900;
   font-size: 24px;
@@ -1001,7 +1001,7 @@ const STYLES = `
 }
 
 .level-number {
-  color: #a7ff00;
+  color: #6f2de9;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .14em;
@@ -1046,12 +1046,12 @@ const STYLES = `
 }
 
 .primary-button {
-  background: #a7ff00;
+  background: #6f2de9;
   color: #070707;
 }
 
 .primary-button:hover {
-  background: #baff45;
+  background: #6f2de9;
 }
 
 .secondary-button {
@@ -1122,7 +1122,7 @@ const STYLES = `
 
 .test-status {
   text-align: right;
-  color: #a7ff00;
+  color: #6f2de9;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .12em;
@@ -1154,7 +1154,7 @@ const STYLES = `
 
 .test-progress > div {
   height: 100%;
-  background: #a7ff00;
+  background: #6f2de9;
 }
 
 .test-layout {
@@ -1171,7 +1171,7 @@ const STYLES = `
 }
 
 .question-number {
-  color: #a7ff00;
+  color: #6f2de9;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .13em;
@@ -1215,7 +1215,7 @@ const STYLES = `
 }
 
 .option.selected {
-  border-color: #a7ff00;
+  border-color: #6f2de9;
   background: #141a0c;
   color: #fff;
 }
@@ -1232,7 +1232,7 @@ const STYLES = `
 }
 
 .option.selected .option-index {
-  background: #a7ff00;
+  background: #6f2de9;
   color: #080808;
 }
 
@@ -1286,13 +1286,13 @@ const STYLES = `
 }
 
 .question-jump.current {
-  border-color: #a7ff00;
-  color: #a7ff00;
+  border-color: #6f2de9;
+  color: #6f2de9;
 }
 
 .question-jump.answered {
   background: #26320f;
-  color: #a7ff00;
+  color: #6f2de9;
 }
 
 .submit-box {
@@ -1328,7 +1328,7 @@ const STYLES = `
   font-size: 90px;
   line-height: 1;
   font-weight: 900;
-  color: #a7ff00;
+  color: #6f2de9;
 }
 
 .result-label {
