@@ -14,11 +14,15 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| ENGVIVA TECHNICAL ASSESSMENT (LAVENDER THEME)
+| ENGVIVA TECHNICAL ASSESSMENT
 |--------------------------------------------------------------------------
 |
 | FLOW
 |
+| /technical-lab
+|       ↓
+| company
+|       ↓
 | /technical-lab/:companyId/levels
 |       ↓
 | level
@@ -28,6 +32,23 @@ import {
 | proctored test
 |       ↓
 | /technical-lab/:companyId/level/:levelNumber/result
+|
+|--------------------------------------------------------------------------
+| IMPORTANT FIX
+|--------------------------------------------------------------------------
+|
+| The backend does NOT return the questions from:
+|
+| GET /api/technical/company/:companyId/levels/:levelNumber
+|
+| That endpoint returns LEVEL METADATA.
+|
+| The verified question endpoint is:
+|
+| GET
+| /api/technical/company/:companyId/levels/:levelNumber/questions/:questionIndex
+|
+| Therefore this file loads each real question through that endpoint.
 |
 |--------------------------------------------------------------------------
 */
@@ -84,8 +105,7 @@ function normalizeId(value) {
     )
     .replace(
       /^-+|-+$/g,
-      ""
-    );
+      "");
 }
 
 function formatTime(seconds) {
@@ -141,52 +161,13 @@ function formatTime(seconds) {
 
 /*
 |--------------------------------------------------------------------------
-| TEXT FORMATTER (MARKDOWN CODE BLOCKS)
-|--------------------------------------------------------------------------
-*/
-
-function renderFormattedText(text) {
-  if (!text) return null;
-  const chunks = text.split("```");
-
-  return chunks.map((chunk, i) => {
-    // If odd index, it was inside ``` code block
-    if (i % 2 === 1) {
-      const lines = chunk.split("\n");
-      // If the first line is something like 'javascript', omit it from display
-      let code = chunk;
-      if (lines.length > 1 && !lines[0].includes(" ")) {
-        code = lines.slice(1).join("\n");
-      }
-      return (
-        <pre key={i} className="code-block">
-          <code>{code}</code>
-        </pre>
-      );
-    }
-
-    // Process inline code blocks inside normal text
-    const inlineChunks = chunk.split("`");
-    return (
-      <span key={i}>
-        {inlineChunks.map((inline, j) =>
-          j % 2 === 1 ? (
-            <code key={j} className="inline-code">
-              {inline}
-            </code>
-          ) : (
-            inline
-          )
-        )}
-      </span>
-    );
-  });
-}
-
-/*
-|--------------------------------------------------------------------------
 | COMPANY FALLBACK
 |--------------------------------------------------------------------------
+|
+| Company identity comes from the backend whenever possible.
+| This fallback only prevents a blank page while the company endpoint
+| is loading.
+|
 */
 
 function companyFromId(id) {
@@ -223,6 +204,12 @@ function companyFromId(id) {
 |--------------------------------------------------------------------------
 | FAVICON LOGO
 |--------------------------------------------------------------------------
+|
+| No Clearbit.
+| No hardcoded logo image.
+|
+| The company domain is converted into a favicon URL exactly as requested.
+|
 */
 
 function CompanyLogo({
@@ -252,7 +239,7 @@ function CompanyLogo({
 
   const src =
     domain
-      ? `[https://www.google.com/s2/favicons?domain=$](https://www.google.com/s2/favicons?domain=$){domain}&sz=256`
+      ? `https://www.google.com/s2/favicons?domain=${domain}&sz=256`
       : "";
 
   if (!src || failed) {
@@ -330,6 +317,18 @@ function normalizeQuestion(
   payload,
   index
 ) {
+  /*
+   * Single-question endpoint returns:
+   *
+   * {
+   *   success: true,
+   *   companyId,
+   *   levelNumber,
+   *   questionIndex,
+   *   question: {...}
+   * }
+   */
+
   const raw =
     payload?.question ||
     payload?.data?.question ||
@@ -717,7 +716,7 @@ async function exitFullscreen() {
 
 /*
 |--------------------------------------------------------------------------
-| CSS (LAVENDER UPDATE)
+| CSS
 |--------------------------------------------------------------------------
 */
 
@@ -789,6 +788,60 @@ const STYLES = `
   padding: 46px 0 80px;
 }
 
+.hero-block {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 36px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 28px;
+  background: linear-gradient(135deg,#111,#0b0b0b);
+  margin-bottom: 46px;
+}
+
+.technical-eyebrow {
+  color: #a7ff00;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .18em;
+}
+
+.hero-block h1 {
+  font-size: clamp(34px,5vw,64px);
+  line-height: .98;
+  margin: 14px 0 18px;
+  max-width: 760px;
+}
+
+.hero-block p {
+  color: #9a9a9a;
+  max-width: 680px;
+  line-height: 1.7;
+}
+
+.hero-stat {
+  min-width: 130px;
+  height: 130px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #101010;
+}
+
+.hero-stat strong {
+  font-size: 40px;
+}
+
+.hero-stat span {
+  color: #777;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .15em;
+}
+
 .section-heading {
   display: flex;
   justify-content: space-between;
@@ -807,6 +860,47 @@ const STYLES = `
 .section-heading h2 {
   margin: 7px 0 0;
   font-size: 28px;
+}
+
+.company-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
+  gap: 14px;
+}
+
+.company-card {
+  text-align: left;
+  border: 1px solid rgba(255,255,255,.08);
+  background: #0e0e0e;
+  color: #fff;
+  border-radius: 20px;
+  padding: 22px;
+  cursor: pointer;
+  transition: .18s ease;
+}
+
+.company-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(167,255,0,.45);
+  background: #121212;
+}
+
+.company-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.company-card h3 {
+  margin: 18px 0 6px;
+  font-size: 18px;
+}
+
+.company-card p {
+  color: #777;
+  font-size: 12px;
+  margin: 0;
 }
 
 .tech-logo {
@@ -838,7 +932,7 @@ const STYLES = `
 }
 
 .tech-logo-fallback {
-  background: #b4a8ff;
+  background: #a7ff00;
   color: #080808;
   font-weight: 900;
   font-size: 24px;
@@ -907,7 +1001,7 @@ const STYLES = `
 }
 
 .level-number {
-  color: #b4a8ff;
+  color: #a7ff00;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .14em;
@@ -952,12 +1046,12 @@ const STYLES = `
 }
 
 .primary-button {
-  background: #b4a8ff;
+  background: #a7ff00;
   color: #070707;
 }
 
 .primary-button:hover {
-  background: #cbbfff;
+  background: #baff45;
 }
 
 .secondary-button {
@@ -1028,7 +1122,7 @@ const STYLES = `
 
 .test-status {
   text-align: right;
-  color: #b4a8ff;
+  color: #a7ff00;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .12em;
@@ -1060,7 +1154,7 @@ const STYLES = `
 
 .test-progress > div {
   height: 100%;
-  background: #b4a8ff;
+  background: #a7ff00;
 }
 
 .test-layout {
@@ -1077,7 +1171,7 @@ const STYLES = `
 }
 
 .question-number {
-  color: #b4a8ff;
+  color: #a7ff00;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .13em;
@@ -1090,33 +1184,11 @@ const STYLES = `
 }
 
 .question-text {
-  font-size: clamp(19px,2.5vw,25px);
-  line-height: 1.45;
+  font-size: clamp(21px,3vw,31px);
+  line-height: 1.35;
   margin: 20px 0 28px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-/* CODE BLOCK CSS */
-.code-block {
-  background: #121017;
-  padding: 16px;
-  border-radius: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 15px;
-  overflow-x: auto;
-  margin: 14px 0;
-  border: 1px solid rgba(180,168,255,0.15);
-  color: #e3dfff;
-}
-
-.inline-code {
-  background: #1d1a24;
-  padding: 3px 6px;
-  border-radius: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.9em;
-  color: #cbbfff;
 }
 
 .options {
@@ -1139,12 +1211,12 @@ const STYLES = `
 }
 
 .option:hover {
-  border-color: rgba(180,168,255,.35);
+  border-color: rgba(167,255,0,.35);
 }
 
 .option.selected {
-  border-color: #b4a8ff;
-  background: #16141f;
+  border-color: #a7ff00;
+  background: #141a0c;
   color: #fff;
 }
 
@@ -1160,7 +1232,7 @@ const STYLES = `
 }
 
 .option.selected .option-index {
-  background: #b4a8ff;
+  background: #a7ff00;
   color: #080808;
 }
 
@@ -1214,13 +1286,13 @@ const STYLES = `
 }
 
 .question-jump.current {
-  border-color: #b4a8ff;
-  color: #b4a8ff;
+  border-color: #a7ff00;
+  color: #a7ff00;
 }
 
 .question-jump.answered {
-  background: #1d1830;
-  color: #b4a8ff;
+  background: #26320f;
+  color: #a7ff00;
 }
 
 .submit-box {
@@ -1256,7 +1328,7 @@ const STYLES = `
   font-size: 90px;
   line-height: 1;
   font-weight: 900;
-  color: #b4a8ff;
+  color: #a7ff00;
 }
 
 .result-label {
@@ -1291,6 +1363,7 @@ const STYLES = `
 }
 
 @media (max-width: 850px) {
+  .hero-block,
   .company-hero {
     flex-direction: column;
     align-items: flex-start;
@@ -1324,6 +1397,7 @@ const STYLES = `
     width: min(100% - 24px, 1180px);
   }
 
+  .hero-block,
   .company-hero,
   .question-card,
   .result-card {
@@ -1410,16 +1484,6 @@ export default function TechnicalAssessment() {
     );
 
   /*
-   * Redirect users directly out of this component if they came 
-   * here without a company selected, solving duplicate pages.
-   */
-  useEffect(() => {
-    if (!routeCompany && !isResultRoute) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [routeCompany, isResultRoute, navigate]);
-
-  /*
    * ----------------------------------------------------------
    * SCREEN
    * ----------------------------------------------------------
@@ -1428,7 +1492,9 @@ export default function TechnicalAssessment() {
   const initialScreen =
     routeLevel > 0
       ? "running"
-      : "levels";
+      : routeCompany
+      ? "levels"
+      : "companies";
 
   const [
     screen,
@@ -1659,101 +1725,137 @@ export default function TechnicalAssessment() {
 
   /*
    * ----------------------------------------------------------
-   * NAVIGATION: DASHBOARD / EXIT
+   * COMPANY LIST
    * ----------------------------------------------------------
+   *
+   * The technical backend company endpoint is used.
+   * We do NOT hardcode a fake company list.
    */
 
-  const goDashboard =
+  const [
+    companies,
+    setCompanies,
+  ] = useState([]);
+
+  const [
+    companiesLoading,
+    setCompaniesLoading,
+  ] = useState(false);
+
+  const loadCompanies =
     useCallback(
       async () => {
-        clearStoredAttempt();
-        clearStoredResult();
-        await exitFullscreen();
-        navigate("/dashboard", { replace: true });
+        setCompaniesLoading(
+          true
+        );
+
+        setError("");
+
+        try {
+          /*
+           * Existing technical company discovery endpoint.
+           */
+
+          const payload =
+            await apiFetch(
+              "/api/technical/companies"
+            );
+
+          const root =
+            payload?.data ??
+            payload;
+
+          const raw =
+            Array.isArray(root)
+              ? root
+              : Array.isArray(
+                  root?.companies
+                )
+              ? root.companies
+              : Array.isArray(
+                  root?.items
+                )
+              ? root.items
+              : [];
+
+          const parsed =
+            raw
+              .map(
+                (item) => ({
+                  ...item,
+                  id:
+                    normalizeId(
+                      item?.id
+                    ),
+                  name:
+                    firstValue(
+                      item?.name,
+                      item?.companyName,
+                      item?.id
+                    ),
+                  category:
+                    firstValue(
+                      item?.category,
+                      "Technology"
+                    ),
+                  domain:
+                    firstValue(
+                      item?.domain,
+                      item?.websiteDomain,
+                      item?.website,
+                      ""
+                    ),
+                })
+              )
+              .filter(
+                (item) =>
+                  item.id
+              );
+
+          /*
+           * If deployment does not expose /companies,
+           * do not invent data. The user can still open a
+           * company directly through the route.
+           */
+
+          setCompanies(
+            parsed
+          );
+        } catch (err) {
+          console.warn(
+            "[TECHNICAL COMPANIES]",
+            err
+          );
+
+          setCompanies([]);
+          setError(
+            err.message ||
+              "Unable to load technical companies."
+          );
+        } finally {
+          setCompaniesLoading(
+            false
+          );
+        }
       },
-      [navigate]
+      []
     );
 
   /*
-   * ----------------------------------------------------------
-   * NAVIGATION: LEVELS
-   * ----------------------------------------------------------
+   * Load companies only on company screen.
    */
 
-  const goLevels =
-    useCallback(
-      async (id) => {
-        const normalized =
-          normalizeId(id);
-
-        if (!normalized) {
-          await goDashboard();
-          return;
-        }
-
-        clearStoredAttempt();
-        clearStoredResult();
-
-        await exitFullscreen();
-
-        setQuestions([]);
-
-        setAnswers({});
-
-        answersRef.current =
-          {};
-
-        setAttemptId(
-          null
-        );
-
-        attemptIdRef.current =
-          null;
-
-        setStartedAt(
-          null
-        );
-
-        setResult(
-          null
-        );
-
-        setViolations([]);
-
-        violationsRef.current =
-          [];
-
-        setProctorWarning(
-          ""
-        );
-
-        setProctorLocked(
-          false
-        );
-
-        setSelectedLevel(
-          null
-        );
-
-        setScreen(
-          "levels"
-        );
-
-        navigate(
-          `/technical-lab/${encodeURIComponent(
-            normalized
-          )}/levels`,
-          {
-            replace: true,
-          }
-        );
-      },
-      [
-        goDashboard,
-        navigate,
-      ]
-    );
-
+  useEffect(() => {
+    if (
+      screen ===
+      "companies"
+    ) {
+      loadCompanies();
+    }
+  }, [
+    screen,
+    loadCompanies,
+  ]);
 
   /*
    * ----------------------------------------------------------
@@ -1821,6 +1923,11 @@ export default function TechnicalAssessment() {
             };
           }
         } catch (err) {
+          /*
+           * Company summary endpoint may be
+           * the available endpoint in this deployment.
+           * Do not block technical navigation.
+           */
           console.warn(
             "[TECHNICAL COMPANY DETAILS]",
             err
@@ -1833,17 +1940,6 @@ export default function TechnicalAssessment() {
       },
       []
     );
-
-  /*
-   * Resolve company on load to populate extra info
-   */
-  useEffect(() => {
-    if (routeCompany && !selectedCompany) {
-       resolveCompany(routeCompany).then(res => {
-          if (res) setSelectedCompany(res);
-       });
-    }
-  }, [routeCompany, selectedCompany, resolveCompany]);
 
   /*
    * ----------------------------------------------------------
@@ -2000,11 +2096,278 @@ export default function TechnicalAssessment() {
     loadLevels,
   ]);
 
+  /*
+   * ----------------------------------------------------------
+   * NAVIGATION: COMPANIES
+   * ----------------------------------------------------------
+   */
+
+  const goCompanies =
+    useCallback(
+      async () => {
+        clearStoredAttempt();
+        clearStoredResult();
+
+        await exitFullscreen();
+
+        setSelectedCompany(
+          null
+        );
+
+        setLevels([]);
+
+        setSelectedLevel(
+          null
+        );
+
+        setQuestions([]);
+
+        setAnswers({});
+
+        answersRef.current =
+          {};
+
+        setAttemptId(
+          null
+        );
+
+        attemptIdRef.current =
+          null;
+
+        setStartedAt(
+          null
+        );
+
+        setResult(
+          null
+        );
+
+        setViolations([]);
+
+        violationsRef.current =
+          [];
+
+        setProctorWarning(
+          ""
+        );
+
+        setProctorLocked(
+          false
+        );
+
+        setError("");
+
+        setScreen(
+          "companies"
+        );
+
+        navigate(
+          "/technical-lab",
+          {
+            replace: true,
+          }
+        );
+      },
+      [navigate]
+    );
+
+  /*
+   * ----------------------------------------------------------
+   * NAVIGATION: LEVELS
+   * ----------------------------------------------------------
+   */
+
+  const goLevels =
+    useCallback(
+      async (id) => {
+        const normalized =
+          normalizeId(id);
+
+        if (!normalized) {
+          await goCompanies();
+          return;
+        }
+
+        clearStoredAttempt();
+        clearStoredResult();
+
+        await exitFullscreen();
+
+        setQuestions([]);
+
+        setAnswers({});
+
+        answersRef.current =
+          {};
+
+        setAttemptId(
+          null
+        );
+
+        attemptIdRef.current =
+          null;
+
+        setStartedAt(
+          null
+        );
+
+        setResult(
+          null
+        );
+
+        setViolations([]);
+
+        violationsRef.current =
+          [];
+
+        setProctorWarning(
+          ""
+        );
+
+        setProctorLocked(
+          false
+        );
+
+        setSelectedLevel(
+          null
+        );
+
+        const resolved =
+          await resolveCompany(
+            normalized
+          );
+
+        setSelectedCompany(
+          resolved ||
+            companyFromId(
+              normalized
+            )
+        );
+
+        setScreen(
+          "levels"
+        );
+
+        navigate(
+          `/technical-lab/${encodeURIComponent(
+            normalized
+          )}/levels`,
+          {
+            replace: true,
+          }
+        );
+      },
+      [
+        goCompanies,
+        navigate,
+        resolveCompany,
+      ]
+    );
+
+  /*
+   * ----------------------------------------------------------
+   * SELECT COMPANY
+   * ----------------------------------------------------------
+   */
+
+  const chooseCompany =
+    useCallback(
+      async (item) => {
+        const id =
+          normalizeId(
+            item?.id
+          );
+
+        if (!id) {
+          return;
+        }
+
+        clearStoredAttempt();
+        clearStoredResult();
+
+        await exitFullscreen();
+
+        const resolved =
+          await resolveCompany(
+            id
+          );
+
+        setSelectedCompany(
+          resolved ||
+            item ||
+            companyFromId(id)
+        );
+
+        setLevels([]);
+
+        setQuestions([]);
+
+        setAnswers({});
+
+        answersRef.current =
+          {};
+
+        setSelectedLevel(
+          null
+        );
+
+        setAttemptId(
+          null
+        );
+
+        setResult(
+          null
+        );
+
+        setError("");
+
+        setScreen(
+          "levels"
+        );
+
+        /*
+         * Clean route.
+         *
+         * CompanyDetails should navigate to
+         * /technical-lab/:companyId/levels
+         */
+
+        navigate(
+          `/technical-lab/${encodeURIComponent(
+            id
+          )}/levels`,
+          {
+            replace: true,
+          }
+        );
+      },
+      [
+        navigate,
+        resolveCompany,
+      ]
+    );
 
   /*
    * ----------------------------------------------------------
    * THE IMPORTANT QUESTION LOADER
    * ----------------------------------------------------------
+   *
+   * DO NOT call:
+   *
+   * /levels/:level
+   *
+   * expecting questions.
+   *
+   * That endpoint is level metadata.
+   *
+   * Instead:
+   *
+   * /levels/:level/questions/0
+   * /levels/:level/questions/1
+   * /levels/:level/questions/2
+   * ...
+   *
+   * We load them in parallel batches.
    */
 
   const loadLevelQuestions =
@@ -2034,6 +2397,11 @@ export default function TechnicalAssessment() {
           );
         }
 
+        /*
+         * First get authoritative level metadata.
+         *
+         * This is NOT used as the question source.
+         */
         const metadata =
           await apiFetch(
             `/api/technical/company/${encodeURIComponent(
@@ -2044,6 +2412,14 @@ export default function TechnicalAssessment() {
         const metadataRoot =
           metadata?.data ??
           metadata;
+
+        /*
+         * If this deployment ever returns the entire
+         * question array, use it immediately.
+         *
+         * This makes the frontend compatible with both
+         * implementations.
+         */
 
         const direct =
           normalizeQuestionCollection(
@@ -2061,6 +2437,11 @@ export default function TechnicalAssessment() {
           };
         }
 
+        /*
+         * Normal verified deployment:
+         *
+         * metadataRoot.questionCount
+         */
         const count =
           Math.max(
             0,
@@ -2083,6 +2464,10 @@ export default function TechnicalAssessment() {
           );
         }
 
+        /*
+         * Batch requests so 60 questions don't create
+         * 60 simultaneous connections.
+         */
         const BATCH_SIZE =
           8;
 
@@ -2136,6 +2521,10 @@ export default function TechnicalAssessment() {
                       questionIndex
                     );
                   } catch (error) {
+                    /*
+                     * A missing question index should
+                     * not destroy the whole assessment.
+                     */
                     console.warn(
                       `[TECHNICAL QUESTION ${questionIndex}]`,
                       error
@@ -2154,6 +2543,9 @@ export default function TechnicalAssessment() {
           );
         }
 
+        /*
+         * Preserve dataset order.
+         */
         loaded.sort(
           (a, b) =>
             safeNumber(
@@ -2164,6 +2556,9 @@ export default function TechnicalAssessment() {
             )
         );
 
+        /*
+         * Deduplicate IDs.
+         */
         const unique =
           [];
 
@@ -2249,9 +2644,19 @@ export default function TechnicalAssessment() {
 
         setError("");
 
+        /*
+         * Fullscreen must happen from the button
+         * gesture before asynchronous work.
+         */
         await enterFullscreen();
 
         try {
+          /*
+           * --------------------------------------------------
+           * 1. LOAD REAL QUESTIONS
+           * --------------------------------------------------
+           */
+
           const questionData =
             await loadLevelQuestions(
               selectedCompany.id,
@@ -2269,6 +2674,12 @@ export default function TechnicalAssessment() {
               "This technical level contains no usable questions."
             );
           }
+
+          /*
+           * --------------------------------------------------
+           * 2. CREATE AUTHORITATIVE SERVER ATTEMPT
+           * --------------------------------------------------
+           */
 
           const startPayload =
             await apiFetch(
@@ -2313,6 +2724,12 @@ export default function TechnicalAssessment() {
             );
           }
 
+          /*
+           * --------------------------------------------------
+           * 3. TIME
+           * --------------------------------------------------
+           */
+
           const minutes =
             Math.max(
               1,
@@ -2341,6 +2758,12 @@ export default function TechnicalAssessment() {
 
           const now =
             new Date().toISOString();
+
+          /*
+           * --------------------------------------------------
+           * 4. LOCAL RECOVERY STATE
+           * --------------------------------------------------
+           */
 
           const session = {
             attemptId:
@@ -2379,6 +2802,12 @@ export default function TechnicalAssessment() {
           );
 
           clearStoredResult();
+
+          /*
+           * --------------------------------------------------
+           * 5. STATE
+           * --------------------------------------------------
+           */
 
           setAttemptId(
             String(id)
@@ -2446,6 +2875,12 @@ export default function TechnicalAssessment() {
             "running"
           );
 
+          /*
+           * --------------------------------------------------
+           * 6. CLEAN TEST URL
+           * --------------------------------------------------
+           */
+
           navigate(
             `/technical-lab/${encodeURIComponent(
               selectedCompany.id
@@ -2480,6 +2915,14 @@ export default function TechnicalAssessment() {
       ]
     );
 
+  /*
+   * ----------------------------------------------------------
+   * RESTORE ACTIVE ATTEMPT
+   * ----------------------------------------------------------
+   *
+   * Refreshing the page during a test should not create
+   * another attempt.
+   */
 
   useEffect(() => {
     if (
@@ -2828,8 +3271,9 @@ export default function TechnicalAssessment() {
           document.visibilityState ===
           "hidden"
         ) {
-          // Immediately Auto Submit on tab switch
-          submitRef.current?.(true, "TAB_HIDDEN");
+          addViolation(
+            "TAB_HIDDEN"
+          );
         }
       };
 
@@ -2838,8 +3282,9 @@ export default function TechnicalAssessment() {
         if (
           !document.fullscreenElement
         ) {
-          // Immediately Auto Submit on fullscreen exit
-          submitRef.current?.(true, "EXITED_FULLSCREEN");
+          addViolation(
+            "FULLSCREEN_EXIT"
+          );
         }
       };
 
@@ -3025,7 +3470,7 @@ export default function TechnicalAssessment() {
 
   /*
    * ----------------------------------------------------------
-   * PROCTOR LIMIT (FOR MINOR VIOLATIONS)
+   * PROCTOR LIMIT
    * ----------------------------------------------------------
    */
 
@@ -3112,6 +3557,12 @@ export default function TechnicalAssessment() {
                 )
             );
 
+          /*
+           * SERVER IS AUTHORITATIVE.
+           *
+           * Never calculate the final score here.
+           */
+
           const payload =
             await apiFetch(
               "/api/technical/assessment/submit",
@@ -3192,6 +3643,11 @@ export default function TechnicalAssessment() {
               "The server returned an invalid assessment result."
             );
           }
+
+          /*
+           * Save result locally only for route recovery.
+           * Firebase/backend remains authoritative.
+           */
 
           saveStoredResult(
             serverResult
@@ -3376,6 +3832,9 @@ export default function TechnicalAssessment() {
     if (
       !finalResult
     ) {
+      /*
+       * Never show a fake result.
+       */
       return (
         <>
           <style>
@@ -3397,10 +3856,10 @@ export default function TechnicalAssessment() {
               <button
                 className="secondary-button"
                 onClick={
-                  goDashboard
+                  goCompanies
                 }
               >
-                Dashboard
+                Technical Lab
               </button>
             </div>
 
@@ -3424,10 +3883,10 @@ export default function TechnicalAssessment() {
                 <button
                   className="primary-button"
                   onClick={
-                    goDashboard
+                    goCompanies
                   }
                 >
-                  Back to Dashboard
+                  Back to Technical Lab
                 </button>
               </section>
             </main>
@@ -3468,10 +3927,10 @@ export default function TechnicalAssessment() {
             <button
               className="secondary-button"
               onClick={
-                goDashboard
+                goCompanies
               }
             >
-              Dashboard
+              Technical Lab
             </button>
           </div>
 
@@ -3597,10 +4056,10 @@ export default function TechnicalAssessment() {
                 <button
                   className="secondary-button"
                   onClick={
-                    goDashboard
+                    goCompanies
                   }
                 >
-                  Dashboard
+                  All Companies
                 </button>
               </div>
             </section>
@@ -3708,7 +4167,7 @@ export default function TechnicalAssessment() {
                 </div>
 
                 <div className="question-text">
-                  {renderFormattedText(currentQuestion?.question)}
+                  {currentQuestion?.question}
                 </div>
 
                 <div className="options">
@@ -3751,7 +4210,7 @@ export default function TechnicalAssessment() {
                           </span>
 
                           <span>
-                            {renderFormattedText(option)}
+                            {option}
                           </span>
                         </button>
                       );
@@ -3952,7 +4411,7 @@ export default function TechnicalAssessment() {
               <button
                 className="tech-back"
                 onClick={
-                  goDashboard
+                  goCompanies
                 }
               >
                 ←
@@ -3974,16 +4433,21 @@ export default function TechnicalAssessment() {
             <button
               className="secondary-button"
               onClick={
-                goDashboard
+                goCompanies
               }
             >
-              Dashboard
+              All Companies
             </button>
           </header>
 
           <main className="technical-container">
             <section className="company-hero">
-              <CompanyLogo company large }/>
+              <CompanyLogo
+                company={
+                  company
+                }
+                large
+              />
 
               <div className="company-hero-copy">
                 <span>
@@ -4179,5 +4643,203 @@ export default function TechnicalAssessment() {
     );
   }
 
-  return null;
+  /*
+   * ----------------------------------------------------------
+   * COMPANY SCREEN
+   * ----------------------------------------------------------
+   */
+
+  return (
+    <>
+      <style>
+        {STYLES}
+      </style>
+
+      <div className="technical-page">
+        <header className="technical-topbar">
+          <div className="technical-topbar-left">
+            <button
+              className="tech-back"
+              onClick={() =>
+                navigate(
+                  "/dashboard"
+                )
+              }
+            >
+              ←
+            </button>
+
+            <div>
+              <div className="tech-top-title">
+                Technical Lab
+              </div>
+
+              <div className="tech-top-subtitle">
+                Engineering preparation
+              </div>
+            </div>
+          </div>
+
+          <button
+            className="secondary-button"
+            onClick={() =>
+              navigate(
+                "/dashboard"
+              )
+            }
+          >
+            Dashboard
+          </button>
+        </header>
+
+        <main className="technical-container">
+          <section className="hero-block">
+            <div>
+              <span className="technical-eyebrow">
+                ENGVIVA / TECHNICAL
+              </span>
+
+              <h1>
+                Train for the
+                companies you want.
+              </h1>
+
+              <p>
+                Select a company, choose a
+                technical level and enter a
+                server-evaluated proctored
+                assessment. Questions are
+                loaded from the installed
+                technical dataset.
+              </p>
+            </div>
+
+            <div className="hero-stat">
+              <strong>
+                {companies.length}
+              </strong>
+
+              <span>
+                COMPANIES
+              </span>
+            </div>
+          </section>
+
+          {error && (
+            <div className="error-banner">
+              {error}
+
+              <button
+                className="secondary-button"
+                style={{
+                  marginLeft:
+                    10,
+                }}
+                onClick={
+                  loadCompanies
+                }
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          <section>
+            <div className="section-heading">
+              <div>
+                <span>
+                  TECHNICAL TRAINING
+                </span>
+
+                <h2>
+                  Select a company
+                </h2>
+              </div>
+
+              <span>
+                DATASET DRIVEN
+              </span>
+            </div>
+
+            {companiesLoading ? (
+              <div className="loading-block">
+                Loading technical
+                companies…
+              </div>
+            ) : companies.length >
+              0 ? (
+              <div className="company-grid">
+                {companies.map(
+                  (
+                    item
+                  ) => (
+                    <button
+                      key={
+                        item.id
+                      }
+                      type="button"
+                      className="company-card"
+                      onClick={() =>
+                        chooseCompany(
+                          item
+                        )
+                      }
+                    >
+                      <div className="company-card-head">
+                        <CompanyLogo
+                          company={
+                            item
+                          }
+                        />
+
+                        <span
+                          style={{
+                            color:
+                              "#555",
+                            fontSize:
+                              18,
+                          }}
+                        >
+                          →
+                        </span>
+                      </div>
+
+                      <h3>
+                        {item.name}
+                      </h3>
+
+                      <p>
+                        {item.category ||
+                          "Technology"}
+                      </p>
+                    </button>
+                  )
+                )}
+              </div>
+            ) : (
+              <div className="empty-block">
+                <strong>
+                  No technical companies
+                  returned.
+                </strong>
+
+                <p
+                  style={{
+                    color:
+                      "#777",
+                  }}
+                >
+                  The technical API did not
+                  return a company collection.
+                  Open a company from
+                  Company Details to enter
+                  its technical levels.
+                </p>
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
+    </>
+  );
 }
